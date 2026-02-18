@@ -19,7 +19,7 @@
     }
     html,body,#root{height:100%;}
     body{background:var(--bg);color:var(--text);font-family:var(--fm);-webkit-font-smoothing:antialiased;overscroll-behavior:none;}
-    input,select,button{font-family:var(--fm);}
+    input,select,button{font-family:var(--fm);-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
     input[type=number]::-webkit-inner-spin-button{opacity:1;}
     ::-webkit-scrollbar{width:4px;height:4px;}
     ::-webkit-scrollbar-track{background:var(--bg2);}
@@ -87,15 +87,15 @@
     .content{flex:1;overflow-y:auto;padding:20px 24px;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;}
 
     /* BOTTOM NAV */
-    .bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);z-index:50;height:var(--nh);}
+    .bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);z-index:50;height:var(--nh);padding-bottom:env(safe-area-inset-bottom,0px);}
     .bn-inner{display:flex;height:100%;}
-    .bn-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--text3);font-size:7px;letter-spacing:1px;text-transform:uppercase;border:none;background:none;font-family:var(--fm);padding:0;}
+    .bn-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--text3);font-size:7px;letter-spacing:1px;text-transform:uppercase;border:none;background:none;font-family:var(--fm);padding:0;-webkit-tap-highlight-color:transparent;min-height:44px;touch-action:manipulation;}
     .bn-item.active{color:var(--gold);}
     .bn-dot{width:3px;height:3px;border-radius:50%;background:var(--gold);margin-top:1px;}
 
     /* PERIOD PICKER */
     .period-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;padding:12px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);}
-    @media(max-width:768px){.period-bar{position:sticky;top:0;z-index:40;border-radius:0;margin:0 -12px 14px;border-left:none;border-right:none;border-top:none;}}
+    @media(max-width:768px){.period-bar{position:sticky;top:0;z-index:40;border-radius:0;margin:-12px -12px 14px;border-left:none;border-right:none;border-top:none;padding:10px 12px;}}
     .period-label{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--text3);}
     .period-sel{background:var(--bg);border:2px solid var(--gold);border-radius:8px;color:var(--gold);padding:10px 14px;font-size:14px;font-family:var(--fm);outline:none;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;min-width:110px;text-align:center;}
 
@@ -177,13 +177,13 @@
     .loading{display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px;background:var(--bg);}
     .spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;}
     @keyframes spin{to{transform:rotate(360deg);}}
-    .fade-in{animation:fadeIn .25s ease;}
-    @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+    .fade-in{animation:fadeIn .2s ease;}
+    @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
 
     @media(max-width:768px){
       .sidebar{display:none;}
       .bottom-nav{display:block;}
-      .content{padding:12px 12px calc(var(--nh)+16px);}
+      .content{padding:12px 12px calc(var(--nh) + 16px + env(safe-area-inset-bottom,0px));-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
       .topbar{padding:0 12px;height:52px;}
       .stats-grid{grid-template-columns:1fr 1fr;gap:7px;}
       .stat-val{font-size:16px;} .stat-card{padding:11px;}
@@ -192,7 +192,7 @@
       .topbar-title{font-size:13px;}
       .hide-mob{display:none!important;}
       .report-tab{font-size:9px;padding:10px 3px;}
-      .period-sel{font-size:16px;padding:12px 10px;min-width:130px;}
+      .period-sel{font-size:16px;padding:14px 10px;min-width:140px;border-radius:8px;}
       .wk-inp{font-size:16px;padding:10px 4px;} /* 16px prevents iOS zoom */
       .wk-box label{font-size:9px;}
       .bn-item{font-size:8px;gap:4px;}
@@ -240,8 +240,8 @@ if (FIREBASE_CONFIGURED) {
   try {
     firebase.initializeApp(FIREBASE_CONFIG);
     db = firebase.firestore();
-    // Enable offline persistence so app works without internet
-    db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+    // Force server data — do NOT use persistence (causes stale cache on mobile)
+    db.settings({ cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED });
   } catch(e) { console.warn("Firebase init failed:", e); }
 }
 </script>
@@ -299,14 +299,17 @@ async function dbGet(userKey, field) {
 }
 
 async function dbSet(userKey, field, value) {
-  // Always write to localStorage as cache
-  lsSet(`${userKey}-${field}`, value);
-  // Write to Firestore if available
+  // Write to Firestore first — this is the source of truth
   if (db) {
     try {
       await db.collection("users").doc(userKey).set({ [field]: value }, { merge: true });
+      // Also cache locally as backup
+      lsSet(`${userKey}-${field}`, value);
+      return;
     } catch(e) { console.warn("Firestore write failed:", e); }
   }
+  // Fallback: localStorage only
+  lsSet(`${userKey}-${field}`, value);
 }
 
 // Users registry
@@ -339,19 +342,30 @@ function useDebouncedCallback(fn, delay) {
   }, [fn, delay]);
 }
 
-// Bootstrap dev account
+// Bootstrap dev account into Firestore (runs once on app load)
 async function bootstrap() {
-  const users = await getUsers();
-  if (!users[DEV_U]) {
-    users[DEV_U] = { hash: hashStr(DEV_P), business: "Pragya Transport (Dev)", isDev: true, created: 0 };
-    await setUsers(users);
-  }
-  const existing = await dbGet(DEV_U, "drivers");
-  if (!existing || existing.length === 0) {
-    await dbSet(DEV_U, "drivers", DEV_DRV);
-    await dbSet(DEV_U, "sales", DEV_SALES);
-    await dbSet(DEV_U, "wap", DEV_WAP);
-  }
+  try {
+    const users = await getUsers();
+    if (!users[DEV_U]) {
+      users[DEV_U] = { hash: hashStr(DEV_P), business: "Pragya Transport (Dev)", isDev: true, created: 0 };
+      await setUsers(users);
+    }
+    // Check Firestore directly for dev drivers
+    if (db) {
+      const doc = await db.collection("users").doc(DEV_U).get();
+      if (!doc.exists || !doc.data().drivers || doc.data().drivers.length===0) {
+        await db.collection("users").doc(DEV_U).set({
+          drivers: DEV_DRV, sales: DEV_SALES, wap: DEV_WAP
+        }, { merge: true });
+      }
+    } else {
+      if (!lsGet(`${DEV_U}-drivers`) || lsGet(`${DEV_U}-drivers`).length===0) {
+        lsSet(`${DEV_U}-drivers`, DEV_DRV);
+        lsSet(`${DEV_U}-sales`, DEV_SALES);
+        lsSet(`${DEV_U}-wap`, DEV_WAP);
+      }
+    }
+  } catch(e) { console.warn("Bootstrap error:", e); }
 }
 
 // ── Icons ─────────────────────────────────────────────────────
@@ -471,9 +485,14 @@ function Auth({onLogin}){
     if(users[ukey]){setErr("Username already taken.");setBusy(false);return;}
     users[ukey]={hash:hashStr(f.p),business:f.b.trim(),isDev:false,created:Date.now()};
     await setUsers(users);
-    await dbSet(ukey,"drivers",[]);
-    await dbSet(ukey,"sales",{});
-    await dbSet(ukey,"wap",{});
+    // Init new user data in Firestore directly
+    if(db){
+      await db.collection("users").doc(ukey).set({drivers:[],sales:{},wap:{}});
+    } else {
+      lsSet(`${ukey}-drivers`,[]);
+      lsSet(`${ukey}-sales`,{});
+      lsSet(`${ukey}-wap`,{});
+    }
     setOk("Account created! Signing you in…");
     setTimeout(()=>{
       const sess={username:ukey,business:f.b.trim(),isDev:false};
@@ -544,6 +563,9 @@ function App(){
 function Dashboard({session,onLogout}){
   const u=session.username;
   const [view,setView]=useState("dashboard");
+  const contentRef=useRef(null);
+  // Scroll to top whenever tab changes
+  const switchView=useCallback((v)=>{ setView(v); setTimeout(()=>{ if(contentRef.current) contentRef.current.scrollTop=0; },0); },[]);
   const [drivers,setDrivers]=useState([]);
   const [sales,setSales]=useState({});
   const [wap,setWap]=useState({});
@@ -557,56 +579,58 @@ function Dashboard({session,onLogout}){
   const [toast,setToast]=useState(false);
   const showToast=useCallback(()=>{ setToast(true); setTimeout(()=>setToast(false),1900); },[]);
 
-  // Load data from cloud on mount
+  // Single source of truth: onSnapshot handles BOTH initial load AND live updates
+  // This is the correct pattern — no separate dbGet needed
   useEffect(()=>{
-    async function load(){
-      const d=await dbGet(u,"drivers");
-      const s=await dbGet(u,"sales");
-      const w=await dbGet(u,"wap");
-      setDrivers(d||[]);
-      setSales(s||{});
-      setWap(w||{});
+    if(!db){
+      // No Firebase — use localStorage only
+      setDrivers(lsGet(`${u}-drivers`)||[]);
+      setSales(lsGet(`${u}-sales`)||{});
+      setWap(lsGet(`${u}-wap`)||{});
       setLoaded(true);
+      return;
     }
-    load();
+    // Listen to Firestore — fires on load AND whenever any device changes data
+    const unsub=db.collection("users").doc(u)
+      .onSnapshot(
+        doc=>{
+          if(doc.exists){
+            const data=doc.data();
+            // Only overwrite if not actively typing (WeekInput manages its own focus)
+            if(data.drivers!==undefined) setDrivers(data.drivers||[]);
+            if(data.sales!==undefined)   setSales(data.sales||{});
+            if(data.wap!==undefined)     setWap(data.wap||{});
+          } else {
+            // New user — init empty
+            setDrivers([]); setSales({}); setWap({});
+          }
+          setLoaded(true);
+        },
+        err=>{
+          // Firestore failed — fall back to localStorage
+          console.warn("Firestore error:",err);
+          setDrivers(lsGet(`${u}-drivers`)||[]);
+          setSales(lsGet(`${u}-sales`)||{});
+          setWap(lsGet(`${u}-wap`)||{});
+          setLoaded(true);
+        }
+      );
+    return()=>unsub();
   },[u]);
 
-  // Track when WE last wrote so we can ignore our own snapshot echoes
-  const lastWriteTime=useRef(0);
-
-  // Real-time listener — updates when ANOTHER device changes data
-  useEffect(()=>{
-    if(!db||!loaded)return;
-    // Skip the first snapshot (it's just the initial load we already have)
-    let isFirstSnapshot=true;
-    const unsub=db.collection("users").doc(u).onSnapshot(doc=>{
-      if(isFirstSnapshot){ isFirstSnapshot=false; return; }
-      // If WE wrote within the last 3 seconds, ignore the echo
-      if(Date.now()-lastWriteTime.current < 3000) return;
-      if(doc.exists){
-        const data=doc.data();
-        // Only update fields that actually changed to avoid input disruption
-        if(data.drivers) setDrivers(data.drivers);
-        if(data.sales)   setSales(data.sales);
-        if(data.wap)     setWap(data.wap);
-      }
-    });
-    return()=>unsub();
-  },[u,loaded]);
-
-  // Auto-save: debounced 2s after any change
+  // Auto-save functions — fire after debounce
   const saveDrivers=useCallback(async(val)=>{
-    setSyncState("saving");lastWriteTime.current=Date.now();
+    setSyncState("saving");
     try{ await dbSet(u,"drivers",val);setSyncState("saved"); }
     catch(e){ setSyncState("error"); }
   },[u]);
   const saveSales=useCallback(async(val)=>{
-    setSyncState("saving");lastWriteTime.current=Date.now();
+    setSyncState("saving");
     try{ await dbSet(u,"sales",val);setSyncState("saved");showToast(); }
     catch(e){ setSyncState("error"); }
   },[u,showToast]);
   const saveWap=useCallback(async(val)=>{
-    setSyncState("saving");lastWriteTime.current=Date.now();
+    setSyncState("saving");
     try{ await dbSet(u,"wap",val);setSyncState("saved");showToast(); }
     catch(e){ setSyncState("error"); }
   },[u,showToast]);
@@ -732,7 +756,7 @@ function Dashboard({session,onLogout}){
         </div>
         <nav style={{padding:"6px 0",flex:1}}>
           {NAV.map(n=>(
-            <div key={n.id} className={`nav-item${view===n.id?" active":""}`} onClick={()=>setView(n.id)}>
+            <div key={n.id} className={`nav-item${view===n.id?" active":""}`} onClick={()=>switchView(n.id)}>
               <Ic name={n.icon} size={13} color={view===n.id?"var(--gold)":"var(--text3)"}/>
               {n.label}
             </div>
@@ -752,8 +776,8 @@ function Dashboard({session,onLogout}){
         <div className="topbar">
           <div className="topbar-title">{NAV.find(n=>n.id===view)?.label}</div>
           <div className="topbar-actions">
-            {/* Sync status on mobile */}
-            <div style={{display:"flex",alignItems:"center",gap:5}} className="hide-mob">
+            {/* Sync status */}
+            <div style={{display:"flex",alignItems:"center",gap:5}}>
               <div className={`sync-dot ${syncState}`}/>
               <span style={{fontSize:9,letterSpacing:1,color:"var(--text3)",textTransform:"uppercase"}}>{syncLabel}</span>
             </div>
@@ -763,8 +787,8 @@ function Dashboard({session,onLogout}){
           </div>
         </div>
 
-        <div className="content">
-          <div key={view} className="fade-in" style={{minHeight:0}}>
+        <div className="content" ref={contentRef}>
+          <div key={view}>
           {view==="dashboard"&&<VDash regD={regD} wapD={wapD} periodSales={periodSales} yearSales={yearSales} wapBal={wapBal} totOwed={totOwed} sales={sales} {...period}/>}
           {view==="drivers"  &&<VDrivers drivers={drivers} setModal={setModal} delDrv={delDrv}/>}
           {view==="sales"    &&<VSales regD={regD} sales={sales} updSale={updSale} {...period}/>}
@@ -778,7 +802,7 @@ function Dashboard({session,onLogout}){
       <nav className="bottom-nav">
         <div className="bn-inner">
           {NAV.slice(0,5).map(n=>(
-            <button key={n.id} className={`bn-item${view===n.id?" active":""}`} onClick={()=>setView(n.id)}>
+            <button key={n.id} className={`bn-item${view===n.id?" active":""}`} onClick={()=>switchView(n.id)}>
               <Ic name={n.icon} size={20} color={view===n.id?"var(--gold)":"var(--text3)"}/>
               {n.label}
               {view===n.id&&<div className="bn-dot"/>}
@@ -797,35 +821,35 @@ function Dashboard({session,onLogout}){
 // VIEWS (Dashboard, Drivers, Sales, W&P, Reports, Transfer)
 // ══════════════════════════════════════════════════════
 
-// ── WeekInput — saves on blur AND on Enter key ────────────────────────────
+// ── WeekInput — stable local state, syncs from cloud only when not focused ──
 function WeekInput({value, onChange}){
-  const [local, setLocal] = useState(value===0?"":value||"");
-  const prevValue = useRef(value);
-  // Sync from cloud updates only when not actively editing
-  const isFocused = useRef(false);
+  const [local,setLocal]=useState(String(value||""));
+  const focused=useRef(false);
+  const lastSaved=useRef(value);
+  // Accept remote updates only when not typing
   useEffect(()=>{
-    if(!isFocused.current && value !== prevValue.current){
-      setLocal(value===0?"":value||"");
-      prevValue.current = value;
+    if(!focused.current && value!==lastSaved.current){
+      setLocal(String(value===0?"":value||""));
+      lastSaved.current=value;
     }
   },[value]);
-  function commit(v){
-    const n=Number(v)||0;
-    prevValue.current=n;
+  function commit(raw){
+    const n=Number(raw)||0;
+    lastSaved.current=n;
     onChange(n);
   }
   return(
     <input
-      type="number"
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
       className="wk-inp"
       value={local}
       placeholder="0"
-      inputMode="decimal"
-      pattern="[0-9]*"
       onChange={e=>setLocal(e.target.value)}
-      onFocus={()=>{ isFocused.current=true; }}
-      onBlur={e=>{ isFocused.current=false; commit(e.target.value); }}
-      onKeyDown={e=>{ if(e.key==="Enter"){ e.target.blur(); } }}
+      onFocus={e=>{ focused.current=true; e.target.select(); }}
+      onBlur={e=>{ focused.current=false; commit(e.target.value); }}
+      onKeyDown={e=>{ if(e.key==="Enter"||e.key==="Done"){ e.target.blur(); } }}
     />
   );
 }
