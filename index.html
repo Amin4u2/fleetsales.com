@@ -84,7 +84,7 @@
     .topbar{padding:0 20px;height:54px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg2);flex-shrink:0;gap:10px;}
     .topbar-title{font-family:var(--fd);font-size:15px;font-weight:700;white-space:nowrap;}
     .topbar-actions{display:flex;gap:6px;align-items:center;flex-shrink:0;}
-    .content{flex:1;overflow-y:auto;padding:20px 24px;}
+    .content{flex:1;overflow-y:auto;padding:20px 24px;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;}
 
     /* BOTTOM NAV */
     .bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);z-index:50;height:var(--nh);}
@@ -94,9 +94,10 @@
     .bn-dot{width:3px;height:3px;border-radius:50%;background:var(--gold);margin-top:1px;}
 
     /* PERIOD PICKER */
-    .period-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;padding:11px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);}
+    .period-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;padding:12px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);}
+    @media(max-width:768px){.period-bar{position:sticky;top:0;z-index:40;border-radius:0;margin:0 -12px 14px;border-left:none;border-right:none;border-top:none;}}
     .period-label{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--text3);}
-    .period-sel{background:var(--bg);border:1px solid var(--gold);border-radius:6px;color:var(--gold);padding:6px 10px;font-size:12px;font-family:var(--fm);outline:none;font-weight:600;cursor:pointer;}
+    .period-sel{background:var(--bg);border:2px solid var(--gold);border-radius:8px;color:var(--gold);padding:10px 14px;font-size:14px;font-family:var(--fm);outline:none;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;min-width:110px;text-align:center;}
 
     /* COMMON */
     .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:20px;}
@@ -139,6 +140,7 @@
     .sales-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:10px;}
     .wks-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:10px;}
     .wk-box label{font-size:8px;letter-spacing:1px;color:var(--text3);margin-bottom:3px;display:block;text-align:center;}
+    .wk-box{display:flex;flex-direction:column;}
     .report-tabs{display:flex;gap:0;margin-bottom:20px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
     .report-tab{flex:1;padding:10px 6px;text-align:center;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;color:var(--text3);background:transparent;border:none;font-family:var(--fm);transition:all .2s;border-right:1px solid var(--border);}
     .report-tab:last-child{border-right:none;}
@@ -165,6 +167,9 @@
     .import-zone input{display:none;}
     .dev-pill{display:inline-block;padding:2px 6px;background:#f5a62322;border:1px solid #f5a62355;border-radius:3px;font-size:8px;letter-spacing:1px;color:var(--gold);text-transform:uppercase;margin-left:6px;vertical-align:middle;}
     .notice{padding:10px 14px;border-radius:6px;font-size:11px;margin-bottom:14px;}
+    .save-toast{position:fixed;bottom:calc(var(--nh)+12px);left:50%;transform:translateX(-50%);background:var(--green);color:#fff;font-size:11px;font-weight:700;letter-spacing:2px;padding:8px 20px;border-radius:99px;z-index:300;animation:toastIn .2s ease,toastOut .3s ease 1.5s forwards;pointer-events:none;}
+    @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+    @keyframes toastOut{from{opacity:1;}to{opacity:0;}}
     .notice-ok{background:#22c55e11;border:1px solid #22c55e33;color:var(--green);}
     .notice-err{background:#ef444411;border:1px solid #ef444433;color:var(--red);}
     .empty-state{text-align:center;padding:50px 20px;color:var(--text3);}
@@ -178,19 +183,25 @@
     @media(max-width:768px){
       .sidebar{display:none;}
       .bottom-nav{display:block;}
-      .content{padding:12px 12px calc(var(--nh)+12px);}
-      .topbar{padding:0 12px;height:50px;}
+      .content{padding:12px 12px calc(var(--nh)+16px);}
+      .topbar{padding:0 12px;height:52px;}
       .stats-grid{grid-template-columns:1fr 1fr;gap:7px;}
       .stat-val{font-size:16px;} .stat-card{padding:11px;}
       .kpi-grid{grid-template-columns:1fr 1fr;}
       .modal-grid{grid-template-columns:1fr;}
       .topbar-title{font-size:13px;}
       .hide-mob{display:none!important;}
-      .report-tab{font-size:9px;padding:8px 3px;}
+      .report-tab{font-size:9px;padding:10px 3px;}
+      .period-sel{font-size:16px;padding:12px 10px;min-width:130px;}
+      .wk-inp{font-size:16px;padding:10px 4px;} /* 16px prevents iOS zoom */
+      .wk-box label{font-size:9px;}
+      .bn-item{font-size:8px;gap:4px;}
     }
     @media(max-width:420px){
-      .wks-grid{gap:3px;} .wk-inp{font-size:10px;padding:5px 2px;}
+      .wks-grid{gap:3px;}
+      /* wk-inp stays at 16px — never go below or iOS will zoom in */
       .kpi-grid{grid-template-columns:1fr 1fr;}
+      .stat-val{font-size:14px;}
     }
   </style>
 </head>
@@ -543,6 +554,8 @@ function Dashboard({session,onLogout}){
   const [syncState,setSyncState]=useState("saved"); // saving | saved | error
   const [importModal,setImportModal]=useState(false);
   const [importMsg,setImportMsg]=useState(null);
+  const [toast,setToast]=useState(false);
+  const showToast=useCallback(()=>{ setToast(true); setTimeout(()=>setToast(false),1900); },[]);
 
   // Load data from cloud on mount
   useEffect(()=>{
@@ -558,36 +571,45 @@ function Dashboard({session,onLogout}){
     load();
   },[u]);
 
-  // Real-time listener — updates when another device changes data
+  // Track when WE last wrote so we can ignore our own snapshot echoes
+  const lastWriteTime=useRef(0);
+
+  // Real-time listener — updates when ANOTHER device changes data
   useEffect(()=>{
     if(!db||!loaded)return;
+    // Skip the first snapshot (it's just the initial load we already have)
+    let isFirstSnapshot=true;
     const unsub=db.collection("users").doc(u).onSnapshot(doc=>{
+      if(isFirstSnapshot){ isFirstSnapshot=false; return; }
+      // If WE wrote within the last 3 seconds, ignore the echo
+      if(Date.now()-lastWriteTime.current < 3000) return;
       if(doc.exists){
         const data=doc.data();
-        if(data.drivers)setDrivers(data.drivers);
-        if(data.sales)setSales(data.sales);
-        if(data.wap)setWap(data.wap);
+        // Only update fields that actually changed to avoid input disruption
+        if(data.drivers) setDrivers(data.drivers);
+        if(data.sales)   setSales(data.sales);
+        if(data.wap)     setWap(data.wap);
       }
     });
     return()=>unsub();
   },[u,loaded]);
 
-  // Auto-save: debounced 1.5s after any change
+  // Auto-save: debounced 2s after any change
   const saveDrivers=useCallback(async(val)=>{
-    setSyncState("saving");
+    setSyncState("saving");lastWriteTime.current=Date.now();
     try{ await dbSet(u,"drivers",val);setSyncState("saved"); }
     catch(e){ setSyncState("error"); }
   },[u]);
   const saveSales=useCallback(async(val)=>{
-    setSyncState("saving");
-    try{ await dbSet(u,"sales",val);setSyncState("saved"); }
+    setSyncState("saving");lastWriteTime.current=Date.now();
+    try{ await dbSet(u,"sales",val);setSyncState("saved");showToast(); }
     catch(e){ setSyncState("error"); }
-  },[u]);
+  },[u,showToast]);
   const saveWap=useCallback(async(val)=>{
-    setSyncState("saving");
-    try{ await dbSet(u,"wap",val);setSyncState("saved"); }
+    setSyncState("saving");lastWriteTime.current=Date.now();
+    try{ await dbSet(u,"wap",val);setSyncState("saved");showToast(); }
     catch(e){ setSyncState("error"); }
-  },[u]);
+  },[u,showToast]);
 
   const debouncedSaveDrivers=useDebouncedCallback(saveDrivers,1500);
   const debouncedSaveSales=useDebouncedCallback(saveSales,1500);
@@ -701,6 +723,7 @@ function Dashboard({session,onLogout}){
     <div className="app">
       {/* Sync bar at very top */}
       <div className={`sync-bar ${syncState}`}/>
+      {toast&&<div className="save-toast">✓ SAVED</div>}
 
       <aside className="sidebar">
         <div className="sb-logo">
@@ -740,13 +763,15 @@ function Dashboard({session,onLogout}){
           </div>
         </div>
 
-        <div className="content fade-in">
+        <div className="content">
+          <div key={view} className="fade-in" style={{minHeight:0}}>
           {view==="dashboard"&&<VDash regD={regD} wapD={wapD} periodSales={periodSales} yearSales={yearSales} wapBal={wapBal} totOwed={totOwed} sales={sales} {...period}/>}
           {view==="drivers"  &&<VDrivers drivers={drivers} setModal={setModal} delDrv={delDrv}/>}
           {view==="sales"    &&<VSales regD={regD} sales={sales} updSale={updSale} {...period}/>}
           {view==="workpay"  &&<VWap wapD={wapD} wap={wap} updWap={updWap} {...period}/>}
           {view==="reports"  &&<VReports regD={regD} wapD={wapD} drivers={drivers} sales={sales} wap={wap} {...period} onExport={doExport}/>}
           {view==="transfer" &&<VTransfer drivers={drivers} sales={sales} wap={wap} session={session} onExport={doExport} onImport={()=>setImportModal(true)}/>}
+          </div>
         </div>
       </div>
 
@@ -771,6 +796,39 @@ function Dashboard({session,onLogout}){
 // ══════════════════════════════════════════════════════
 // VIEWS (Dashboard, Drivers, Sales, W&P, Reports, Transfer)
 // ══════════════════════════════════════════════════════
+
+// ── WeekInput — saves on blur AND on Enter key ────────────────────────────
+function WeekInput({value, onChange}){
+  const [local, setLocal] = useState(value===0?"":value||"");
+  const prevValue = useRef(value);
+  // Sync from cloud updates only when not actively editing
+  const isFocused = useRef(false);
+  useEffect(()=>{
+    if(!isFocused.current && value !== prevValue.current){
+      setLocal(value===0?"":value||"");
+      prevValue.current = value;
+    }
+  },[value]);
+  function commit(v){
+    const n=Number(v)||0;
+    prevValue.current=n;
+    onChange(n);
+  }
+  return(
+    <input
+      type="number"
+      className="wk-inp"
+      value={local}
+      placeholder="0"
+      inputMode="decimal"
+      pattern="[0-9]*"
+      onChange={e=>setLocal(e.target.value)}
+      onFocus={()=>{ isFocused.current=true; }}
+      onBlur={e=>{ isFocused.current=false; commit(e.target.value); }}
+      onKeyDown={e=>{ if(e.key==="Enter"){ e.target.blur(); } }}
+    />
+  );
+}
 
 function VDash({regD,wapD,periodSales,yearSales,wapBal,totOwed,sales,selYear,selMonth,setSelYear,setSelMonth}){
   const maxP=regD.reduce((mx,d)=>Math.max(mx,sumO(((sales[d.id]||{})[selYear]||{})[selMonth]||{})),1);
@@ -898,7 +956,7 @@ function VSales({regD,sales,updSale,selYear,selMonth,setSelYear,setSelMonth}){
               {[1,2,3,4,5].map(w=>(
                 <div key={w} className="wk-box">
                   <label>Wk {w}</label>
-                  <input type="number" className="wk-inp" value={wks[w]||""} placeholder="0" onChange={e=>updSale(d.id,selYear,selMonth,w,e.target.value)}/>
+                  <WeekInput value={wks[w]} onChange={n=>updSale(d.id,selYear,selMonth,w,n)}/>
                 </div>
               ))}
             </div>
@@ -963,7 +1021,7 @@ function VWap({wapD,wap,updWap,selYear,selMonth,setSelYear,setSelMonth}){
               {[1,2,3,4,5].map(w=>(
                 <div key={w} className="wk-box">
                   <label>Wk {w}</label>
-                  <input type="number" className="wk-inp" value={mWks[w]||""} placeholder="0" onChange={e=>updWap(d.id,selYear,selMonth,w,e.target.value)}/>
+                  <WeekInput value={mWks[w]} onChange={n=>updWap(d.id,selYear,selMonth,w,n)}/>
                 </div>
               ))}
             </div>
