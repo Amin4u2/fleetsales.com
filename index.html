@@ -516,7 +516,7 @@ async function bootstrap() {
   try {
     const users = await getUsers();
     if (!users[DEV_U]) {
-      users[DEV_U] = { hash: hashStr(DEV_P), business: "Pragya Transport (Dev)", isDev: true, created: 0 };
+      users[DEV_U] = { hash: hashStr(DEV_P), business: "Administrator", isDev: true, created: 0 };
       await setUsers(users);
     }
     // Check Firestore directly for dev drivers
@@ -1067,7 +1067,7 @@ function Dashboard({session,subStatus,onLogout}){
     {id:"workpay",label:"W&P",icon:"wap"},
     {id:"reports",label:"Reports",icon:"report"},
     {id:"transfer",label:"Data",icon:"transfer"},
-    ...(session.isDev?[{id:"admin",label:"Admin",icon:"drivers"}]:[]),
+    ...(session.isDev?[{id:"admin",label:"Admin ⚙",icon:"drivers"}]:[]),
   ];
   const period={selYear,selMonth,setSelYear,setSelMonth};
 
@@ -1084,7 +1084,7 @@ function Dashboard({session,subStatus,onLogout}){
       <aside className="sidebar">
         <div className="sb-logo">
           <div className="sb-logo-main">🛺 Pragya</div>
-          <div className="sb-logo-sub">{session.business}{session.isDev&&<span className="dev-pill">DEV</span>}</div>
+          <div className="sb-logo-sub">{session.isDev?"Amin Moro Mohammed":(session.business)}{session.isDev&&<span className="dev-pill">ADMIN</span>}</div>
         </div>
         <nav style={{padding:"6px 0",flex:1}}>
           {NAV.map(n=>(
@@ -1655,12 +1655,14 @@ function VAdmin(){
   const [search,setSearch]=useState("");
   const [msg,setMsg]=useState(null);
   const [loading,setLoading]=useState(true);
+  const [aTab,setATab]=useState("overview"); // overview | users | payments | settings
+  const [customDays,setCustomDays]=useState(30);
+  const [expandUser,setExpandUser]=useState(null);
 
   useEffect(()=>{
     async function load(){
       const u=await getUsers();
       setUsers(u);
-      // Load pending payments from Firestore
       if(db){
         const snap=await db.collection("pending_payments").get();
         setPending(snap.docs.map(d=>({id:d.id,...d.data()})));
@@ -1670,8 +1672,9 @@ function VAdmin(){
     load();
   },[]);
 
-  async function activate(username,plan,days=30){
-    const paidUntil=Date.now()+days*86400000;
+  async function activate(username,plan,days){
+    const d=days||customDays||30;
+    const paidUntil=Date.now()+d*86400000;
     const data={plan,paid:true,paidUntil,activatedAt:Date.now(),activatedBy:DEV_U};
     setSub(username,data);
     if(db){
@@ -1679,94 +1682,360 @@ function VAdmin(){
       await db.collection("pending_payments").doc(username).delete();
     }
     setPending(p=>p.filter(x=>x.id!==username));
-    setMsg({type:"ok",text:`✓ ${username} activated on ${PLANS[plan]?.name||plan} for ${days} days`});
-    setTimeout(()=>setMsg(null),3000);
+    // Update local users display
+    setUsers(u=>({...u}));
+    setMsg({type:"ok",text:`✓ @${username} activated — ${PLANS[plan]?.name} for ${d} days`});
+    setTimeout(()=>setMsg(null),4000);
   }
 
   async function deactivate(username){
-    const data={plan:null,paid:false,paidUntil:0};
+    if(!window.confirm(`Deactivate @${username}? They will lose access immediately.`))return;
+    const data={plan:null,paid:false,paidUntil:0,revokedAt:Date.now()};
     setSub(username,data);
     if(db) await db.collection("subscriptions").doc(username).set(data);
-    setMsg({type:"warn",text:`${username} deactivated`});
-    setTimeout(()=>setMsg(null),3000);
+    setMsg({type:"warn",text:`@${username} deactivated`});
+    setTimeout(()=>setMsg(null),4000);
   }
 
-  const allUsers=Object.keys(users).filter(u=>u!==DEV_U&&u.includes(search.toLowerCase()));
+  async function extendDays(username,days){
+    const cur=subStatus(username);
+    const base=cur.active&&cur.paidUntil?cur.paidUntil:Date.now();
+    const paidUntil=base+(days*86400000);
+    const data={...getSub(username),paid:true,paidUntil,extendedAt:Date.now()};
+    setSub(username,data);
+    if(db) await db.collection("subscriptions").doc(username).set(data);
+    setMsg({type:"ok",text:`✓ @${username} extended by ${days} days`});
+    setTimeout(()=>setMsg(null),4000);
+  }
 
-  if(loading)return<div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>Loading…</div>;
+  async function deleteUser(username){
+    if(!window.confirm(`PERMANENTLY delete @${username} and ALL their data? This cannot be undone.`))return;
+    const u=await getUsers();
+    delete u[username];
+    await setUsers(u);
+    if(db){
+      await db.collection("users").doc(username).delete();
+      await db.collection("subscriptions").doc(username).delete();
+      await db.collection("pending_payments").doc(username).delete();
+    }
+    lsSet(`pg-sub-${username}`,null);
+    setUsers({...u});
+    setMsg({type:"warn",text:`@${username} permanently deleted`});
+    setTimeout(()=>setMsg(null),4000);
+  }
+
+  const allUsers=Object.keys(users).filter(u=>u!==DEV_U);
+  const filtered=allUsers.filter(u=>u.includes(search.toLowerCase())||(users[u]?.business||"").toLowerCase().includes(search.toLowerCase()));
+
+  // Stats
+  const activeUsers=allUsers.filter(u=>{ const s=subStatus(u); return s.active&&!s.trial; });
+  const trialUsers=allUsers.filter(u=>subStatus(u).trial);
+  const expiredUsers=allUsers.filter(u=>subStatus(u).expired);
+  const revenue=activeUsers.reduce((t,u)=>{ const s=subStatus(u); return t+(PLANS[s.plan]?.price||0); },0);
+
+  if(loading)return<div style={{textAlign:"center",padding:60,color:"var(--text3)"}}>
+    <div className="spinner" style={{margin:"0 auto 12px"}}/>Loading admin data…
+  </div>;
 
   return(
     <div>
-      {/* Pending payments — show first */}
-      {pending.length>0&&(
-        <div className="card" style={{marginBottom:14,border:"1px solid var(--gold)"}}>
-          <div className="sec-title" style={{color:"var(--gold)"}}>🔔 Pending Payments ({pending.length})</div>
-          {pending.map(p=>{
-            const plan=PLANS[p.plan];
-            const age=Math.floor((Date.now()-p.requestedAt)/60000);
+      {/* Admin header */}
+      <div style={{background:"linear-gradient(135deg,#1a1200,#0a0a0f)",border:"1px solid var(--gold)",borderRadius:10,padding:"16px 20px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+        <div>
+          <div style={{fontFamily:"var(--fd)",fontSize:18,fontWeight:800,color:"var(--gold)"}}>⚙ Admin Dashboard</div>
+          <div style={{fontSize:10,color:"var(--text3)",letterSpacing:2,marginTop:2}}>AMISCO4U2 · FULL ACCESS</div>
+        </div>
+        <div style={{fontSize:10,color:"var(--text3)"}}>Firebase: <span style={{color:db?"var(--green)":"var(--red)"}}>{db?"Connected ✓":"Offline"}</span></div>
+      </div>
+
+      {msg&&<div className={`notice ${msg.type==="ok"?"notice-ok":"notice-warn"}`} style={{marginBottom:14}}>{msg.text}</div>}
+
+      {/* Tabs */}
+      <div className="report-tabs" style={{marginBottom:16}}>
+        {[["overview","Overview"],["users","Users"],["payments","Payments"],["settings","Settings"]].map(([id,lbl])=>(
+          <button key={id} className={`report-tab${aTab===id?" active":""}`} onClick={()=>setATab(id)}>{lbl}</button>
+        ))}
+      </div>
+
+      {/* ── OVERVIEW ── */}
+      {aTab==="overview"&&(
+        <div>
+          {/* KPI row */}
+          <div className="stats-grid" style={{marginBottom:14}}>
+            <div className="stat-card">
+              <div className="stat-label">Total Users</div>
+              <div className="stat-val">{allUsers.length}</div>
+              <div className="stat-sub">registered accounts</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Paying</div>
+              <div className="stat-val" style={{color:"var(--green)"}}>{activeUsers.length}</div>
+              <div className="stat-sub">active subscriptions</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">On Trial</div>
+              <div className="stat-val" style={{color:"var(--gold)"}}>{trialUsers.length}</div>
+              <div className="stat-sub">free trial users</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Monthly Revenue</div>
+              <div className="stat-val" style={{fontSize:16}}>{fmt(revenue)}</div>
+              <div className="stat-sub">from {activeUsers.length} paid users</div>
+            </div>
+          </div>
+
+          {/* Pending payments alert */}
+          {pending.length>0&&(
+            <div className="card" style={{marginBottom:14,border:"1px solid var(--gold)"}}>
+              <div className="sec-title" style={{color:"var(--gold)"}}>🔔 Pending Payments — Action Required ({pending.length})</div>
+              {pending.map(p=>{
+                const plan=PLANS[p.plan];
+                const age=Math.floor((Date.now()-p.requestedAt)/60000);
+                const ageStr=age<60?`${age}m ago`:age<1440?`${Math.floor(age/60)}h ago`:`${Math.floor(age/1440)}d ago`;
+                return(
+                  <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 0",borderBottom:"1px solid var(--border)",gap:10,flexWrap:"wrap"}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:13,color:"var(--text)",marginBottom:2}}>@{p.id}</div>
+                      <div style={{fontSize:11,color:"var(--text3)"}}>{plan?.name||p.plan} · {plan?.priceLabel} · {ageStr}</div>
+                    </div>
+                    <div style={{display:"flex",gap:7,flexShrink:0,flexWrap:"wrap"}}>
+                      {Object.values(PLANS).map(pl=>(
+                        <button key={pl.id} className={pl.id===p.plan?"btn":"btn-sm"} style={{padding:"8px 12px",fontSize:9}} onClick={()=>activate(p.id,pl.id,30)}>
+                          ✓ {pl.name}
+                        </button>
+                      ))}
+                      <button className="btn-danger" style={{fontSize:9,padding:"8px 10px"}} onClick={()=>deactivate(p.id)}>Reject</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {pending.length===0&&(
+            <div style={{textAlign:"center",padding:"20px",color:"var(--text3)",fontSize:11,marginBottom:14}}>
+              ✓ No pending payments
+            </div>
+          )}
+
+          {/* Plan breakdown */}
+          <div className="card">
+            <div className="sec-title">Subscription Breakdown</div>
+            {Object.values(PLANS).map(pl=>{
+              const count=activeUsers.filter(u=>subStatus(u).plan===pl.id).length;
+              return(
+                <div key={pl.id} className="bar-row">
+                  <div className="bar-label" style={{color:pl.color,fontWeight:600}}>{pl.name}</div>
+                  <div className="bar-track">
+                    <div className="bar-fill rank-1" style={{width:`${activeUsers.length?pct(count,activeUsers.length):0}%`,background:pl.color}}>
+                      {count>0&&<span style={{color:"#0a0a0f",fontSize:10}}>{count} user{count!==1?"s":""}</span>}
+                    </div>
+                  </div>
+                  <div className="bar-val" style={{color:pl.color}}>{fmt(count*pl.price)}/mo</div>
+                </div>
+              );
+            })}
+            <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:11,color:"var(--text3)"}}>Total monthly revenue</span>
+              <span style={{fontSize:16,fontWeight:800,color:"var(--gold)",fontFamily:"var(--fd)"}}>{fmt(revenue)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── USERS ── */}
+      {aTab==="users"&&(
+        <div>
+          <div className="card" style={{marginBottom:14}}>
+            <input className="inp" placeholder="Search by username or business…" value={search} onChange={e=>setSearch(e.target.value)}/>
+          </div>
+
+          {filtered.length===0&&<div className="card empty-state"><div className="empty-ico">👤</div><div style={{fontSize:12,letterSpacing:2}}>NO USERS YET</div></div>}
+
+          {filtered.map(u=>{
+            const status=subStatus(u);
+            const usr=users[u];
+            const isExpanded=expandUser===u;
+            const joined=usr?.created?new Date(usr.created).toLocaleDateString():"—";
             return(
-              <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid var(--border)",gap:10,flexWrap:"wrap"}}>
-                <div>
-                  <div style={{fontWeight:700,fontSize:13,color:"var(--text)",marginBottom:3}}>{p.id}</div>
-                  <div style={{fontSize:11,color:"var(--text3)"}}>{plan?.name} · {plan?.priceLabel} · {age}m ago</div>
+              <div key={u} className="card" style={{marginBottom:10,border:isExpanded?"1px solid var(--gold)":"1px solid var(--border)"}}>
+                {/* User header row */}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,cursor:"pointer"}} onClick={()=>setExpandUser(isExpanded?null:u)}>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
+                      <span style={{fontFamily:"var(--fd)",fontWeight:800,fontSize:14,color:"var(--text)"}}>{usr?.business||u}</span>
+                      {status.trial&&<span style={{fontSize:8,color:"var(--gold)",background:"#f5a62322",padding:"2px 7px",borderRadius:99,border:"1px solid #f5a62344",letterSpacing:1}}>TRIAL · {status.daysLeft}d</span>}
+                      {status.active&&!status.trial&&<span style={{fontSize:8,color:"var(--green)",background:"#22c55e22",padding:"2px 7px",borderRadius:99,border:"1px solid #22c55e44",letterSpacing:1}}>{PLANS[status.plan]?.name?.toUpperCase()} · ACTIVE</span>}
+                      {status.expired&&<span style={{fontSize:8,color:"var(--red)",background:"#ef444422",padding:"2px 7px",borderRadius:99,border:"1px solid #ef444444",letterSpacing:1}}>EXPIRED</span>}
+                    </div>
+                    <div style={{fontSize:10,color:"var(--text3)"}}>@{u} · Joined {joined}{status.paidUntil?" · Expires "+new Date(status.paidUntil).toLocaleDateString():""}</div>
+                  </div>
+                  <span style={{fontSize:12,color:"var(--text3)",flexShrink:0}}>{isExpanded?"▲":"▼"}</span>
                 </div>
-                <div style={{display:"flex",gap:7,flexShrink:0}}>
-                  {Object.values(PLANS).map(pl=>(
-                    <button key={pl.id} className={pl.id===p.plan?"btn":"btn-sm"} style={{padding:"7px 12px",fontSize:9}} onClick={()=>activate(p.id,pl.id,30)}>
-                      ✓ {pl.name}
-                    </button>
-                  ))}
-                </div>
+
+                {/* Expanded controls */}
+                {isExpanded&&(
+                  <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid var(--border)"}}>
+                    <div style={{fontSize:9,letterSpacing:2,color:"var(--text3)",marginBottom:10,textTransform:"uppercase"}}>Activate / Extend</div>
+                    <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:12}}>
+                      {Object.values(PLANS).map(pl=>(
+                        <button key={pl.id} className="btn-sm" style={{fontSize:10,padding:"7px 14px",borderColor:pl.color,color:pl.color}} onClick={()=>activate(u,pl.id,30)}>
+                          {pl.name} 30d
+                        </button>
+                      ))}
+                      {Object.values(PLANS).map(pl=>(
+                        <button key={pl.id+"90"} className="btn-sm" style={{fontSize:10,padding:"7px 14px"}} onClick={()=>activate(u,pl.id,90)}>
+                          {pl.name} 90d
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12,flexWrap:"wrap"}}>
+                      <span style={{fontSize:10,color:"var(--text3)"}}>Custom days:</span>
+                      <input type="number" className="inp" value={customDays} onChange={e=>setCustomDays(Number(e.target.value))} style={{width:70,padding:"6px 10px",fontSize:12}}/>
+                      {status.active&&Object.values(PLANS).map(pl=>(
+                        <button key={pl.id} className="btn-sm" style={{fontSize:10,padding:"7px 12px"}} onClick={()=>extendDays(u,customDays)}>
+                          +{customDays}d
+                        </button>
+                      ))}
+                      {!status.active&&Object.values(PLANS).map(pl=>(
+                        <button key={pl.id} className="btn-sm" style={{fontSize:10,padding:"7px 12px",borderColor:pl.color,color:pl.color}} onClick={()=>activate(u,pl.id,customDays)}>
+                          {pl.name} {customDays}d
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      {status.active&&<button className="btn-danger" onClick={()=>deactivate(u)}>Revoke Access</button>}
+                      <button className="btn-danger" style={{opacity:.7}} onClick={()=>deleteUser(u)}>Delete Account</button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       )}
 
-      {msg&&<div className={`notice ${msg.type==="ok"?"notice-ok":"notice-warn"}`}>{msg.text}</div>}
+      {/* ── PAYMENTS ── */}
+      {aTab==="payments"&&(
+        <div>
+          <div className="card" style={{marginBottom:14}}>
+            <div className="sec-title">Payment History</div>
+            {allUsers.filter(u=>{const s=subStatus(u);return s.paid||s.paidUntil;}).length===0
+              ?<div style={{fontSize:11,color:"var(--text3)",padding:"8px 0"}}>No payments recorded yet.</div>
+              :allUsers.filter(u=>{const s=getSub(u);return s&&s.paid;}).map(u=>{
+                const s=getSub(u);const status=subStatus(u);
+                return(
+                  <div key={u} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",borderBottom:"1px solid var(--border)",flexWrap:"wrap",gap:8}}>
+                    <div>
+                      <div style={{fontWeight:600,fontSize:12,marginBottom:2}}>@{u}</div>
+                      <div style={{fontSize:10,color:"var(--text3)"}}>{PLANS[s.plan]?.name} · Activated {s.activatedAt?new Date(s.activatedAt).toLocaleDateString():"—"}</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:13,fontWeight:700,color:status.active?"var(--green)":"var(--red)"}}>{status.active?"Active":"Expired"}</div>
+                      <div style={{fontSize:10,color:"var(--text3)"}}>until {s.paidUntil?new Date(s.paidUntil).toLocaleDateString():"—"}</div>
+                    </div>
+                  </div>
+                );
+              })
+            }
+            <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between"}}>
+              <span style={{fontSize:11,color:"var(--text3)"}}>Active subscriptions revenue</span>
+              <span style={{fontSize:14,fontWeight:700,color:"var(--gold)"}}>{fmt(revenue)}/month</span>
+            </div>
+          </div>
 
-      {/* All users */}
-      <div className="card">
-        <div className="sec-title">All Users ({allUsers.length})</div>
-        <input className="inp" placeholder="Search username…" value={search} onChange={e=>setSearch(e.target.value)} style={{marginBottom:14}}/>
-        {allUsers.length===0&&<div style={{fontSize:11,color:"var(--text3)",padding:"8px 0"}}>No users yet.</div>}
-        {allUsers.map(u=>{
-          const status=subStatus(u);
-          const usr=users[u];
-          return(
-            <div key={u} style={{padding:"12px 0",borderBottom:"1px solid var(--border)"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
-                <div>
-                  <div style={{fontWeight:700,fontSize:13,color:"var(--text)",marginBottom:2}}>@{u}</div>
-                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:5}}>{usr?.business||"—"}</div>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                    {status.trial&&<span style={{fontSize:9,color:"var(--gold)",background:"#f5a62322",padding:"2px 8px",borderRadius:99,border:"1px solid #f5a62344"}}>{status.daysLeft}d trial left</span>}
-                    {status.active&&!status.trial&&<span style={{fontSize:9,color:"var(--green)",background:"#22c55e22",padding:"2px 8px",borderRadius:99,border:"1px solid #22c55e44"}}>{PLANS[status.plan]?.name} · Active</span>}
-                    {status.expired&&<span style={{fontSize:9,color:"var(--red)",background:"#ef444422",padding:"2px 8px",borderRadius:99,border:"1px solid #ef444444"}}>Expired</span>}
-                    {status.paidUntil&&<span style={{fontSize:9,color:"var(--text3)"}}>until {new Date(status.paidUntil).toLocaleDateString()}</span>}
+          <div className="card">
+            <div className="sec-title">🔔 Pending ({pending.length})</div>
+            {pending.length===0&&<div style={{fontSize:11,color:"var(--text3)"}}>No pending payments.</div>}
+            {pending.map(p=>{
+              const plan=PLANS[p.plan];
+              const age=Math.floor((Date.now()-p.requestedAt)/60000);
+              const ageStr=age<60?`${age}m ago`:age<1440?`${Math.floor(age/60)}h ago`:`${Math.floor(age/1440)}d ago`;
+              return(
+                <div key={p.id} style={{padding:"14px 0",borderBottom:"1px solid var(--border)"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:10}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:13,color:"var(--text)",marginBottom:2}}>@{p.id}</div>
+                      <div style={{fontSize:11,color:"var(--text3)"}}>{plan?.name} · {plan?.priceLabel} · requested {ageStr}</div>
+                    </div>
+                    <button className="btn-danger" style={{fontSize:9,padding:"6px 12px"}} onClick={()=>{
+                      if(db)db.collection("pending_payments").doc(p.id).delete();
+                      setPending(pp=>pp.filter(x=>x.id!==p.id));
+                    }}>Remove</button>
+                  </div>
+                  <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+                    {Object.values(PLANS).map(pl=>(
+                      <button key={pl.id} className={pl.id===p.plan?"btn":"btn-sm"} style={{fontSize:9,padding:"7px 14px"}} onClick={()=>activate(p.id,pl.id,30)}>
+                        ✓ Activate {pl.name}
+                      </button>
+                    ))}
                   </div>
                 </div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap",flexShrink:0}}>
-                  {Object.values(PLANS).map(pl=>(
-                    <button key={pl.id} className="btn-sm" style={{fontSize:9,padding:"5px 10px"}} onClick={()=>activate(u,pl.id,30)}>
-                      +{pl.name}
-                    </button>
-                  ))}
-                  {status.active&&<button className="btn-danger" style={{fontSize:9,padding:"5px 10px"}} onClick={()=>deactivate(u)}>Revoke</button>}
-                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── SETTINGS ── */}
+      {aTab==="settings"&&(
+        <div>
+          <div className="card" style={{marginBottom:14}}>
+            <div className="sec-title">Developer Account</div>
+            <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:14}}>
+              <div style={{flex:1,background:"var(--bg)",borderRadius:8,padding:"14px",border:"1px solid var(--border)"}}>
+                <div style={{fontSize:9,letterSpacing:2,color:"var(--text3)",marginBottom:4}}>USERNAME</div>
+                <div style={{fontSize:14,fontWeight:700,color:"var(--gold)",fontFamily:"var(--fd)"}}>amisco4u2</div>
+              </div>
+              <div style={{flex:1,background:"var(--bg)",borderRadius:8,padding:"14px",border:"1px solid var(--border)"}}>
+                <div style={{fontSize:9,letterSpacing:2,color:"var(--text3)",marginBottom:4}}>ACCESS LEVEL</div>
+                <div style={{fontSize:14,fontWeight:700,color:"var(--green)",fontFamily:"var(--fd)"}}>Full Admin</div>
+              </div>
+              <div style={{flex:1,background:"var(--bg)",borderRadius:8,padding:"14px",border:"1px solid var(--border)"}}>
+                <div style={{fontSize:9,letterSpacing:2,color:"var(--text3)",marginBottom:4}}>SUBSCRIPTION</div>
+                <div style={{fontSize:14,fontWeight:700,color:"var(--green)",fontFamily:"var(--fd)"}}>Unlimited ∞</div>
               </div>
             </div>
-          );
-        })}
-      </div>
+            <div style={{fontSize:11,color:"var(--text3)",lineHeight:1.8,padding:"12px 14px",background:"var(--bg)",borderRadius:6}}>
+              The developer account has unlimited access to all features, never expires, and is the only account that can see this Admin panel. No other user can access admin controls.
+            </div>
+          </div>
 
-      <div style={{marginTop:16,padding:"14px 16px",background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:8,fontSize:11,color:"var(--text3)",lineHeight:1.8}}>
-        <strong style={{color:"var(--text2)"}}>How it works:</strong><br/>
-        1. User pays MoMo to your number and WhatsApps their username<br/>
-        2. They appear in <strong style={{color:"var(--gold)"}}>Pending Payments</strong> above<br/>
-        3. You tap <strong style={{color:"var(--gold)"}}>✓ Activate</strong> — they get instant access<br/>
-        4. Their subscription is stored in Firebase — works on all their devices
-      </div>
+          <div className="card" style={{marginBottom:14}}>
+            <div className="sec-title">MoMo Payment Numbers</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div style={{background:"#f59e0b22",border:"1px solid #f59e0b44",borderRadius:8,padding:"14px",textAlign:"center"}}>
+                <div style={{fontSize:9,letterSpacing:2,color:"#f59e0b",fontWeight:700,marginBottom:4}}>MTN MOMO</div>
+                <div style={{fontSize:18,fontWeight:800,color:"var(--gold)",fontFamily:"var(--fd)"}}>{OWNER.mtn}</div>
+                <div style={{fontSize:10,color:"var(--text3)",marginTop:3}}>{OWNER.name}</div>
+              </div>
+              <div style={{background:"#ef444422",border:"1px solid #ef444444",borderRadius:8,padding:"14px",textAlign:"center"}}>
+                <div style={{fontSize:9,letterSpacing:2,color:"#ef4444",fontWeight:700,marginBottom:4}}>TELECEL</div>
+                <div style={{fontSize:18,fontWeight:800,color:"#ef4444",fontFamily:"var(--fd)"}}>{OWNER.telecel}</div>
+                <div style={{fontSize:10,color:"var(--text3)",marginTop:3}}>{OWNER.name}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="sec-title">App Stats</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              {[
+                ["Total Users",allUsers.length],
+                ["Paying Users",activeUsers.length],
+                ["Trial Users",trialUsers.length],
+                ["Expired Users",expiredUsers.length],
+                ["Pending Payments",pending.length],
+                ["Monthly Revenue",fmt(revenue)],
+              ].map(([label,val])=>(
+                <div key={label} style={{background:"var(--bg)",borderRadius:8,padding:"12px 14px",border:"1px solid var(--border)"}}>
+                  <div style={{fontSize:9,letterSpacing:2,color:"var(--text3)",marginBottom:4,textTransform:"uppercase"}}>{label}</div>
+                  <div style={{fontSize:16,fontWeight:700,color:"var(--gold)",fontFamily:"var(--fd)"}}>{val}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
