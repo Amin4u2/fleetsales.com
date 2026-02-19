@@ -11,7 +11,7 @@
   <meta name="application-name" content="FleetSales"/>
   <meta name="description" content="FleetSales — Business Sales Management System for Taxi, Bolt, Uber, Okada, Pragya &amp; more. Track drivers, sales and work-and-pay across your fleet."/>
   <meta name="msapplication-TileColor" content="#0a0a0f"/>
-  <meta property="og:title" content="FleetSales — Business Sales Management System "/>
+  <meta property="og:title" content="FleetSales — Business Sales Management System"/>
   <meta property="og:description" content="Track drivers, sales and work-and-pay for your Taxi, Bolt, Uber, Okada or Pragya fleet."/>
   <meta property="og:url" content="https://fleetsales.web.app"/>
   <meta property="og:type" content="website"/>
@@ -20,6 +20,7 @@
   <meta name="twitter:description" content="Business Sales Management System for transport fleets"/>
   <!-- PWA Manifest (inline as data URI so it works from a single HTML file) -->
   <link rel="manifest" id="pwa-manifest"/>
+  <link rel="icon" id="favicon-icon" type="image/png"/>
   <!-- Apple Touch Icons (generated via JS below) -->
   <link rel="apple-touch-icon" id="apple-icon"/>
   <title>FleetSales — Business Sales Management System</title>
@@ -278,8 +279,9 @@
   const icon192 = makeIcon(192);
   const icon512 = makeIcon(512);
 
-  // Set apple touch icon
+  // Set apple touch icon and favicon from generated canvas
   document.getElementById('apple-icon').href = icon192;
+  document.getElementById('favicon-icon').href = icon192;
 
   // Expose so React can update icon after login
   window.__updatePWAIcon = function(vehicleType) {
@@ -291,7 +293,7 @@
     const manifest = {
       name: 'FleetSales', short_name: 'FleetSales',
       description: 'FleetSales — Business Sales Management System',
-      start_url: 'https://fleetsales.web.app/', scope: 'https://fleetsales.web.app/', display: 'standalone',
+      start_url: '/', scope: '/', display: 'standalone',
       orientation: 'portrait-primary',
       background_color: '#0a0a0f', theme_color: '#0a0a0f',
       categories: ['business', 'finance'],
@@ -308,8 +310,8 @@
     name: 'FleetSales',
     short_name: 'FleetSales',
     description: 'FleetSales — Business Sales Management System for Taxi, Bolt, Uber, Okada, Pragya & more',
-    start_url: 'https://fleetsales.web.app/',
-    scope: 'https://fleetsales.web.app/',
+    start_url: '/',
+    scope: '/',
     display: 'standalone',
     orientation: 'portrait-primary',
     background_color: '#0a0a0f',
