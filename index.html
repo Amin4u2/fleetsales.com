@@ -883,6 +883,78 @@ function App(){
   return<Dashboard session={sess} subStatus={status} onLogout={logout}/>;
 }
 
+
+// ── Mobile Nav — shows all tabs + sign out in a slide-up menu ────────────
+function MobileNav({NAV,view,switchView,onLogout,session,syncState}){
+  const [menuOpen,setMenuOpen]=useState(false);
+
+  // Main tabs: first 4 always visible, then overflow into More
+  const mainNav=NAV.slice(0,4);
+  const overflowNav=NAV.slice(4); // reports, transfer, admin (if dev)
+
+  function goTo(id){ switchView(id); setMenuOpen(false); }
+
+  const syncColor={saving:"var(--gold)",saved:"var(--green)",error:"var(--red)"}[syncState]||"var(--text3)";
+  const syncLabel={saving:"Saving…",saved:"Saved ✓",error:"Sync Error"}[syncState]||"";
+
+  return(
+    <>
+      {/* Slide-up overlay menu */}
+      {menuOpen&&(
+        <div style={{position:"fixed",inset:0,zIndex:199}} onClick={()=>setMenuOpen(false)}>
+          <div style={{position:"absolute",bottom:"calc(var(--nh) + env(safe-area-inset-bottom,0px))",left:0,right:0,background:"var(--bg2)",borderTop:"1px solid var(--border2)",borderRadius:"16px 16px 0 0",padding:"16px 12px 8px",boxShadow:"0 -8px 30px rgba(0,0,0,.6)"}}
+            onClick={e=>e.stopPropagation()}>
+
+            {/* Sync status */}
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:14,paddingBottom:12,borderBottom:"1px solid var(--border)"}}>
+              <div style={{width:7,height:7,borderRadius:"50%",background:syncColor,flexShrink:0}}/>
+              <span style={{fontSize:10,letterSpacing:1,color:"var(--text3)",flex:1}}>{syncLabel}</span>
+              <span style={{fontSize:10,color:"var(--text3)"}}>@{session.username}</span>
+            </div>
+
+            {/* Overflow nav items */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>
+              {overflowNav.map(n=>(
+                <button key={n.id} onClick={()=>goTo(n.id)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"14px 8px",background:view===n.id?"#f5a62315":"var(--bg)",border:`1px solid ${view===n.id?"var(--gold)":"var(--border)"}`,borderRadius:10,cursor:"pointer",color:view===n.id?"var(--gold)":"var(--text2)",fontFamily:"var(--fm)",fontSize:9,letterSpacing:1,textTransform:"uppercase",WebkitTapHighlightColor:"transparent",touchAction:"manipulation"}}>
+                  <Ic name={n.icon} size={22} color={view===n.id?"var(--gold)":"var(--text2)"}/>
+                  {n.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Sign out */}
+            <button onClick={onLogout} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"13px",background:"#ef444411",border:"1px solid #ef444433",borderRadius:10,color:"var(--red)",fontFamily:"var(--fm)",fontSize:11,letterSpacing:2,textTransform:"uppercase",cursor:"pointer",WebkitTapHighlightColor:"transparent",touchAction:"manipulation"}}>
+              <Ic name="logout" size={14} color="var(--red)"/>
+              Sign Out
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom nav bar */}
+      <nav className="bottom-nav">
+        <div className="bn-inner">
+          {mainNav.map(n=>(
+            <button key={n.id} className={`bn-item${view===n.id?" active":""}`} onClick={()=>switchView(n.id)}>
+              <Ic name={n.icon} size={20} color={view===n.id?"var(--gold)":"var(--text3)"}/>
+              {n.label}
+              {view===n.id&&<div className="bn-dot"/>}
+            </button>
+          ))}
+          {/* More button */}
+          <button className={`bn-item${menuOpen?" active":""}`} onClick={()=>setMenuOpen(o=>!o)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={menuOpen?"var(--gold)":"var(--text3)"} strokeWidth="1.8" strokeLinecap="round">
+              <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
+            </svg>
+            More
+            {menuOpen&&<div className="bn-dot"/>}
+          </button>
+        </div>
+      </nav>
+    </>
+  );
+}
+
 // ── DASHBOARD ─────────────────────────────────────────────────
 function Dashboard({session,subStatus,onLogout}){
   const u=session.username;
@@ -913,34 +985,30 @@ function Dashboard({session,subStatus,onLogout}){
   },[]);
 
   // Single source of truth: onSnapshot handles BOTH initial load AND live updates
-  // This is the correct pattern — no separate dbGet needed
   useEffect(()=>{
     if(!db){
-      // No Firebase — use localStorage only
       setDrivers(lsGet(`${u}-drivers`)||[]);
       setSales(lsGet(`${u}-sales`)||{});
       setWap(lsGet(`${u}-wap`)||{});
       setLoaded(true);
       return;
     }
-    // Listen to Firestore — fires on load AND whenever any device changes data
+    // Listen to Firestore — fires immediately on load AND on any device change
     const unsub=db.collection("users").doc(u)
       .onSnapshot(
+        {includeMetadataChanges:false}, // only real server changes, not local writes
         doc=>{
           if(doc.exists){
             const data=doc.data();
-            // Only overwrite if not actively typing (WeekInput manages its own focus)
             if(data.drivers!==undefined) setDrivers(data.drivers||[]);
             if(data.sales!==undefined)   setSales(data.sales||{});
             if(data.wap!==undefined)     setWap(data.wap||{});
           } else {
-            // New user — init empty
             setDrivers([]); setSales({}); setWap({});
           }
           setLoaded(true);
         },
         err=>{
-          // Firestore failed — fall back to localStorage
           console.warn("Firestore error:",err);
           setDrivers(lsGet(`${u}-drivers`)||[]);
           setSales(lsGet(`${u}-sales`)||{});
@@ -948,7 +1016,19 @@ function Dashboard({session,subStatus,onLogout}){
           setLoaded(true);
         }
       );
-    return()=>unsub();
+
+    // Also listen to subscription changes (so admin activation reflects immediately)
+    const unsubSub=db.collection("subscriptions").doc(u)
+      .onSnapshot(doc=>{
+        if(doc.exists){
+          const data=doc.data();
+          // Merge into localStorage so subStatus() picks it up
+          const existing=getSub(u)||{};
+          setSub(u,{...existing,...data});
+        }
+      }, ()=>{});
+
+    return()=>{ unsub(); unsubSub(); };
   },[u]);
 
   // Auto-save functions — fire after debounce
@@ -1128,7 +1208,7 @@ function Dashboard({session,subStatus,onLogout}){
             </div>
             {view==="drivers"&&<button className="btn" onClick={()=>setModal({type:"add"})}><Ic name="plus" size={12} color="#0a0a0f"/>Add</button>}
             {view==="reports"&&<button className="btn" onClick={doExport}><Ic name="download" size={12} color="#0a0a0f"/>Export</button>}
-            <button className="btn-outline hide-mob" onClick={onLogout} style={{padding:"6px 10px"}}><Ic name="logout" size={13}/></button>
+            {/* Sign out in sidebar on desktop only — mobile uses MobileNav More menu */}
           </div>
         </div>
 
@@ -1155,17 +1235,7 @@ function Dashboard({session,subStatus,onLogout}){
         </div>
       </div>
 
-      <nav className="bottom-nav">
-        <div className="bn-inner">
-          {NAV.slice(0,5).map(n=>(
-            <button key={n.id} className={`bn-item${view===n.id?" active":""}`} onClick={()=>switchView(n.id)}>
-              <Ic name={n.icon} size={20} color={view===n.id?"var(--gold)":"var(--text3)"}/>
-              {n.label}
-              {view===n.id&&<div className="bn-dot"/>}
-            </button>
-          ))}
-        </div>
-      </nav>
+      <MobileNav NAV={NAV} view={view} switchView={switchView} onLogout={onLogout} session={session} syncState={syncState}/>
 
       {modal&&<DrvModal driver={modal.data||null} onSave={saveDrv} onClose={()=>setModal(null)}/>}
       {importModal&&<ImportModal onFile={handleImport} msg={importMsg} onClose={()=>{setImportModal(false);setImportMsg(null);}}/>}
