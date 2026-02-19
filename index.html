@@ -292,8 +292,7 @@
         { src: i512, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
       ]
     };
-    const blob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
-    document.getElementById('pwa-manifest').href = URL.createObjectURL(blob);
+    document.getElementById('pwa-manifest').href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(manifest));
   };
 
   // ── 2. Inject Web App Manifest ─────────────────────────────
@@ -313,65 +312,14 @@
       { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
     ]
   };
-  const blob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
-  document.getElementById('pwa-manifest').href = URL.createObjectURL(blob);
+  // Use data: URI — blob: URLs for manifests are blocked by browsers
+  const manifestData = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(manifest));
+  document.getElementById('pwa-manifest').href = manifestData;
 
-  // ── 3. Register Service Worker ─────────────────────────────
-  if ('serviceWorker' in navigator) {
-    // Inline service worker as a blob
-    const swCode = `
-const CACHE = 'fleetsales-v1';
-const SHELL = [
-  self.location.href.replace('sw-inline','').split('?')[0]
-];
-
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())
-  );
-});
-
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', e => {
-  // Only cache same-origin requests, pass through Firebase/Google calls
-  const url = new URL(e.request.url);
-  if (url.origin !== location.origin) return;
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      const fresh = fetch(e.request).then(res => {
-        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
-        return res;
-      });
-      return cached || fresh;
-    })
-  );
-});
-`;
-    const swBlob = new Blob([swCode], {type:'application/javascript'});
-    const swUrl = URL.createObjectURL(swBlob);
-    navigator.serviceWorker.register(swUrl, {scope: './'})
-      .then(reg => {
-        console.log('[PWA] Service worker registered, scope:', reg.scope);
-        reg.addEventListener('updatefound', () => {
-          reg.installing.addEventListener('statechange', e => {
-            if(e.target.state === 'installed' && navigator.serviceWorker.controller) {
-              // New version available — show refresh prompt
-              if(confirm('New version of FleetSales available! Reload to update?')) {
-                window.location.reload();
-              }
-            }
-          });
-        });
-      })
-      .catch(e => console.warn('[PWA] SW registration failed:', e));
-  }
+  // ── 3. Service Worker ────────────────────────────────────────
+  // Note: blob: SW URLs are blocked by browsers — skip on GitHub Pages hosting
+  // The app works fully without a SW; Firebase handles offline data sync
+  console.log('[FleetSales] PWA ready — running on', location.hostname);
 
   // ── 4. Install prompt (Android Chrome) ────────────────────
   let deferredPrompt = null;
@@ -427,7 +375,6 @@ if (FIREBASE_CONFIGURED) {
   try {
     firebase.initializeApp(FIREBASE_CONFIG);
     db = firebase.firestore();
-    db.settings({ cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED });
   } catch(e) { console.warn("Firebase init failed:", e); }
 }
 </script>
@@ -1242,7 +1189,7 @@ function Dashboard({session,subStatus,onLogout}){
         <div className="sb-logo">
           {/* Vehicle icon — big and prominent */}
           <div style={{fontSize:32,lineHeight:1,marginBottom:6}}>
-            {getVehicle(session.vehicleType).icon}
+            {getVehicle(session?.vehicleType||"other").icon}
           </div>
           {/* Business name — this is their identity */}
           <div className="sb-logo-main" style={{fontSize:14,lineHeight:1.3,wordBreak:"break-word"}}>
@@ -1291,7 +1238,7 @@ function Dashboard({session,subStatus,onLogout}){
       <div className="main">
         <div className="topbar">
           <div style={{display:"flex",alignItems:"center",gap:8,overflow:"hidden"}}>
-            <span style={{fontSize:20,flexShrink:0}}>{getVehicle(session.vehicleType).icon}</span>
+            <span style={{fontSize:20,flexShrink:0}}>{getVehicle(session?.vehicleType||"other").icon}</span>
             <div style={{overflow:"hidden"}}>
               <div className="topbar-title" style={{fontSize:11,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
                 {session.business||session.username}
@@ -1325,7 +1272,7 @@ function Dashboard({session,subStatus,onLogout}){
         </div>}
         <div className="content" ref={contentRef}>
           <div key={view}>
-          {view==="dashboard"&&<VDash regD={regD} wapD={wapD} periodSales={periodSales} yearSales={yearSales} wapBal={wapBal} totOwed={totOwed} sales={sales} {...period}/>}
+          {view==="dashboard"&&<VDash regD={regD} wapD={wapD} periodSales={periodSales} yearSales={yearSales} wapBal={wapBal} totOwed={totOwed} sales={sales} session={session} {...period}/>}
           {view==="drivers"  &&<VDrivers drivers={drivers} vehicleType={session.vehicleType} setModal={setModal} delDrv={delDrv}/>}
           {view==="sales"    &&<VSales regD={regD} sales={sales} updSale={updSale} {...period}/>}
           {view==="workpay"  &&<VWap wapD={wapD} wap={wap} updWap={updWap} {...period}/>}
@@ -1381,14 +1328,15 @@ function WeekInput({value, onChange}){
   );
 }
 
-function VDash({regD,wapD,periodSales,yearSales,wapBal,totOwed,sales,selYear,selMonth,setSelYear,setSelMonth}){
+function VDash({regD,wapD,periodSales,yearSales,wapBal,totOwed,sales,session,selYear,selMonth,setSelYear,setSelMonth}){
+  const vt=getVehicle(session?.vehicleType||"other");
   const maxP=regD.reduce((mx,d)=>Math.max(mx,sumO(((sales[d.id]||{})[selYear]||{})[selMonth]||{})),1);
   return(
     <div>
       <PeriodPicker year={selYear} month={selMonth} setYear={setSelYear} setMonth={setSelMonth} label="VIEWING"/>
       <div className="stats-grid">
         <div className="stat-card" style={{borderColor:"var(--gold)",borderWidth:1}}>
-          <div style={{fontSize:24,marginBottom:4}}>{getVehicle(session.vehicleType).icon}</div>
+          <div style={{fontSize:24,marginBottom:4}}>{getVehicle(session?.vehicleType||"other").icon}</div>
           <div className="stat-label" style={{fontSize:9,color:"var(--gold)"}}>{session.business||session.username}</div>
           <div className="stat-val" style={{fontSize:16}}>{regD.length+wapD.length}</div>
           <div className="stat-sub">{regD.length} reg · {wapD.length} W&P</div>
