@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "target": "fleetsales",
+    "site": "fleetsales",
     "public": ".",
     "ignore": [
       "firebase.json",
@@ -12,6 +12,14 @@
       {
         "source": "**",
         "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        ]
       }
     ]
   }
