@@ -31,14 +31,25 @@
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
     :root{
-      --gold:#f5a623;--gold2:#ffd166;--bg:#0a0a0f;--bg2:#111118;
-      --border:#22222f;--border2:#2a2a3a;--text:#e8e4f0;
-      --text2:#9994aa;--text3:#55525f;--red:#ef4444;--green:#22c55e;--blue:#3b82f6;
+      --gold:#f5a623;--gold2:#ffd166;
+      /* Night (dark) mode — default */
+      --bg:#0a0a0f;--bg2:#111118;
+      --border:#22222f;--border2:#2a2a3a;
+      --text:#e8e4f0;--text2:#9994aa;--text3:#55525f;
+      --red:#ef4444;--green:#22c55e;--blue:#3b82f6;
       --fd:'Syne',sans-serif;--fm:'JetBrains Mono',monospace;
-      --r:8px;--nh:60px;
+      --r:8px;--nh:68px;
+      /* Base font scale — increased for readability */
+      --fbase:15px;
+    }
+    /* Day (light) mode */
+    body.day-mode{
+      --bg:#f5f5f0;--bg2:#ffffff;
+      --border:#d4d0c8;--border2:#c8c4bc;
+      --text:#1a1a1a;--text2:#444444;--text3:#888880;
     }
     html,body,#root{height:100%;}
-    body{background:var(--bg);color:var(--text);font-family:var(--fm);-webkit-font-smoothing:antialiased;overscroll-behavior:none;}
+    body{background:var(--bg);color:var(--text);font-family:var(--fm);font-size:var(--fbase);-webkit-font-smoothing:antialiased;overscroll-behavior:none;transition:background .2s,color .2s;}
     input,select,button{font-family:var(--fm);-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
     input[type=number]::-webkit-inner-spin-button{opacity:1;}
     ::-webkit-scrollbar{width:4px;height:4px;}
@@ -93,7 +104,7 @@
     .sb-logo{padding:20px 20px 18px;border-bottom:1px solid var(--border);}
     .sb-logo-main{font-family:var(--fd);font-size:18px;font-weight:800;color:var(--gold);}
     .sb-logo-sub{font-size:9px;letter-spacing:2px;color:var(--text3);margin-top:3px;line-height:1.5;}
-    .nav-item{display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);border-left:2px solid transparent;transition:all .15s;}
+    .nav-item{display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);border-left:2px solid transparent;transition:all .15s;}
     .nav-item.active{color:var(--gold);background:#f5a62308;border-left-color:var(--gold);}
     .nav-item:hover:not(.active){color:var(--text2);background:#ffffff04;}
     .sb-footer{margin-top:auto;padding:14px 20px;border-top:1px solid var(--border);}
@@ -109,7 +120,7 @@
     /* BOTTOM NAV */
     .bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);z-index:50;height:var(--nh);padding-bottom:env(safe-area-inset-bottom,0px);}
     .bn-inner{display:flex;height:100%;}
-    .bn-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--text3);font-size:7px;letter-spacing:1px;text-transform:uppercase;border:none;background:none;font-family:var(--fm);padding:0;-webkit-tap-highlight-color:transparent;min-height:44px;touch-action:manipulation;}
+    .bn-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color:var(--text3);font-size:10px;letter-spacing:1px;text-transform:uppercase;border:none;background:none;font-family:var(--fm);padding:0;-webkit-tap-highlight-color:transparent;min-height:48px;touch-action:manipulation;}
     .bn-item.active{color:var(--gold);}
     .bn-dot{width:3px;height:3px;border-radius:50%;background:var(--gold);margin-top:1px;}
 
@@ -124,7 +135,7 @@
     .sec-title{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--text3);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);}
     .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
     .stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:15px 18px;}
-    .stat-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-bottom:6px;}
+    .stat-label{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-bottom:6px;}
     .stat-val{font-size:20px;font-weight:700;color:var(--gold);font-family:var(--fd);line-height:1;}
     .stat-sub{font-size:10px;color:var(--text3);margin-top:4px;}
     .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
@@ -216,7 +227,7 @@
       .period-sel{font-size:16px;padding:14px 10px;min-width:140px;border-radius:8px;}
       .wk-inp{font-size:16px;padding:10px 4px;} /* 16px prevents iOS zoom */
       .wk-box label{font-size:9px;}
-      .bn-item{font-size:8px;gap:4px;}
+      .bn-item{font-size:11px;gap:4px;}
     }
     @media(max-width:420px){
       .wks-grid{gap:3px;}
@@ -224,6 +235,20 @@
       .kpi-grid{grid-template-columns:1fr 1fr;}
       .stat-val{font-size:14px;}
     }
+
+    /* Day/Night toggle button */
+    .vision-btn{display:flex;align-items:center;gap:7px;width:100%;padding:9px 14px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text2);font-family:var(--fm);font-size:12px;letter-spacing:1px;cursor:pointer;transition:all .2s;text-transform:uppercase;}
+    .vision-btn:hover{border-color:var(--gold);color:var(--gold);}
+    body.day-mode .vision-btn{background:#f5a62322;border-color:#f5a62344;color:var(--gold);}
+    /* Day mode card / input overrides */
+    body.day-mode .auth-card,body.day-mode .setup-card{background:#ffffff;border-color:#d4d0c8;}
+    body.day-mode .field input,body.day-mode .cfg-inp{background:#f0efe8;border-color:#c8c4bc;color:#1a1a1a;}
+    body.day-mode .auth-btn{color:#fff;}
+    body.day-mode .stat-card,body.day-mode .card,body.day-mode .kpi-card{background:#ffffff;border-color:#d4d0c8;}
+    body.day-mode .sidebar{background:#ffffff;border-color:#d4d0c8;}
+    body.day-mode .bottom-nav{background:#ffffff;border-color:#d4d0c8;}
+    body.day-mode input,body.day-mode select{background:#f0efe8 !important;border-color:#c8c4bc !important;color:#1a1a1a !important;}
+    body.day-mode .modal-box,body.day-mode [style*="bg2"]{background:#ffffff;}
   </style>
 </head>
 <body>
@@ -925,6 +950,35 @@ function App(){
 
 
 // ── Mobile Nav — shows all tabs + sign out in a slide-up menu ────────────
+
+// ── Day / Night Vision Toggle ─────────────────────────────────
+function VisionToggle(){
+  const [isDay,setIsDay]=useState(()=>document.body.classList.contains("day-mode"));
+  function toggle(){
+    const next=!isDay;
+    document.body.classList.toggle("day-mode",next);
+    setIsDay(next);
+    try{localStorage.setItem("fs-vision",next?"day":"night");}catch(e){}
+  }
+  return(
+    <button onClick={toggle}
+      style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"13px",
+        background:isDay?"#f5a62320":"#ffffff10",
+        border:`1px solid ${isDay?"#f5a62355":"#ffffff20"}`,
+        borderRadius:10,color:isDay?"var(--gold)":"var(--text2)",
+        fontFamily:"var(--fm)",fontSize:11,letterSpacing:2,textTransform:"uppercase",
+        cursor:"pointer",WebkitTapHighlightColor:"transparent",touchAction:"manipulation"}}>
+      <span style={{fontSize:16}}>{isDay?"🌙":"☀️"}</span>
+      {isDay?"Switch to Night":"Switch to Day"}
+    </button>
+  );
+}
+
+// Restore saved vision mode on load
+(function(){
+  try{if(localStorage.getItem("fs-vision")==="day")document.body.classList.add("day-mode");}catch(e){}
+})();
+
 function MobileNav({NAV,view,switchView,onLogout,session,syncState}){
   const [menuOpen,setMenuOpen]=useState(false);
 
@@ -963,8 +1017,10 @@ function MobileNav({NAV,view,switchView,onLogout,session,syncState}){
               ))}
             </div>
 
+            {/* Day/Night toggle */}
+            <VisionToggle/>
             {/* Sign out */}
-            <button onClick={onLogout} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"13px",background:"#ef444411",border:"1px solid #ef444433",borderRadius:10,color:"var(--red)",fontFamily:"var(--fm)",fontSize:11,letterSpacing:2,textTransform:"uppercase",cursor:"pointer",WebkitTapHighlightColor:"transparent",touchAction:"manipulation"}}>
+            <button onClick={onLogout} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"13px",background:"#ef444411",border:"1px solid #ef444433",borderRadius:10,color:"var(--red)",fontFamily:"var(--fm)",fontSize:11,letterSpacing:2,textTransform:"uppercase",cursor:"pointer",WebkitTapHighlightColor:"transparent",touchAction:"manipulation",marginTop:8}}>
               <Ic name="logout" size={14} color="var(--red)"/>
               Sign Out
             </button>
@@ -1257,7 +1313,8 @@ function Dashboard({session,subStatus,onLogout}){
           {installable&&<button className="btn" style={{width:"100%",marginBottom:10,fontSize:10,padding:"8px 12px"}} onClick={()=>window.__pwaPrompt&&window.__pwaPrompt()}>
             ⬇ Install App
           </button>}
-          <div className="sb-user">@<span>{u}</span></div>
+          <VisionToggle/>
+          <div className="sb-user" style={{marginTop:10}}>@<span>{u}</span></div>
           <button className="logout-btn" onClick={onLogout}><Ic name="logout" size={10}/> Sign Out</button>
         </div>
       </aside>
@@ -2332,6 +2389,47 @@ function RenewalModal({title,costLabel,showInsurer,initData,onClose,onSave,input
   );
 }
 
+
+// ── Add Manual Pending Payment Modal (admin) ─────────────────────────
+function AddPendingModal({onClose,onSave}){
+  const [f,setF]=useState({username:"",plan:"standard",amount:"",notes:""});
+  const sv=(k,v)=>setF(p=>({...p,[k]:v}));
+  const IS={width:"100%",background:"var(--bg)",border:"1px solid var(--border2)",borderRadius:6,color:"var(--text)",padding:"12px 14px",fontSize:13,outline:"none",fontFamily:"var(--fm)"};
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <div style={{background:"var(--bg2)",border:"1px solid var(--gold)",borderRadius:14,padding:24,width:"100%",maxWidth:480}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontFamily:"var(--fd)",fontSize:16,fontWeight:700,color:"var(--gold)",marginBottom:6}}>＋ Add Pending Payment</div>
+        <div style={{fontSize:11,color:"var(--text3)",marginBottom:20}}>Use this to manually record a payment made outside the app — e.g. Zuruka Motors or anyone who paid via MoMo without going through the subscription flow.</div>
+
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:10,letterSpacing:2,color:"var(--text3)",marginBottom:5}}>USERNAME (their login username)</div>
+          <input style={IS} value={f.username} onChange={e=>sv("username",e.target.value.toLowerCase().trim())} placeholder="e.g. zurukamotor"/>
+        </div>
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:10,letterSpacing:2,color:"var(--text3)",marginBottom:5}}>PLAN</div>
+          <select style={IS} value={f.plan} onChange={e=>sv("plan",e.target.value)}>
+            {Object.values(PLANS).map(p=><option key={p.id} value={p.id}>{p.name} — {p.priceLabel}</option>)}
+          </select>
+        </div>
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:10,letterSpacing:2,color:"var(--text3)",marginBottom:5}}>AMOUNT PAID (GH₵ pesewas, e.g. 3000 = GH₵ 30)</div>
+          <input type="number" style={IS} value={f.amount} onChange={e=>sv("amount",e.target.value)} placeholder="3000"/>
+        </div>
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:10,letterSpacing:2,color:"var(--text3)",marginBottom:5}}>NOTES (MoMo reference, business name, etc.)</div>
+          <input style={IS} value={f.notes} onChange={e=>sv("notes",e.target.value)} placeholder="e.g. Zuruka Motors — paid GH₵ 30 MoMo ref AB12345"/>
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          <button className="btn-outline" style={{flex:1,padding:13,fontSize:12,justifyContent:"center"}} onClick={onClose}>Cancel</button>
+          <button className="btn" style={{flex:2,padding:13,fontSize:12,justifyContent:"center"}} onClick={()=>onSave(f.username,f.plan,Number(f.amount),f.notes)} disabled={!f.username}>
+            Add to Pending
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function VAdmin(){
   const [users,setUsers]=useState({});
   const [pending,setPending]=useState([]);
@@ -2342,18 +2440,47 @@ function VAdmin(){
   const [customDays,setCustomDays]=useState(30);
   const [expandUser,setExpandUser]=useState(null);
 
-  useEffect(()=>{
-    async function load(){
-      const u=await getUsers();
-      setUsers(u);
-      if(db){
-        const snap=await db.collection("pending_payments").get();
-        setPending(snap.docs.map(d=>({id:d.id,...d.data()})));
-      }
-      setLoading(false);
+  const [addPayModal,setAddPayModal]=useState(false);
+
+  async function reload(){
+    setLoading(true);
+    const u=await getUsers();
+    setUsers(u);
+    if(db){
+      const snap=await db.collection("pending_payments").get();
+      setPending(snap.docs.map(d=>({id:d.id,...d.data()})));
+    } else {
+      // No Firestore — scan localStorage for any pg-pending-* keys
+      const localPending=[];
+      try{
+        for(let i=0;i<localStorage.length;i++){
+          const k=localStorage.key(i);
+          if(k&&k.startsWith("pg-pending-")){
+            const val=JSON.parse(localStorage.getItem(k)||"null");
+            if(val&&val.status==="pending") localPending.push({id:val.username,...val});
+          }
+        }
+      }catch(e){}
+      setPending(localPending);
     }
-    load();
-  },[]);
+    setLoading(false);
+  }
+
+  useEffect(()=>{ reload(); },[]);
+
+  async function addManualPending(username,plan,amount,notes){
+    const pending={username,plan,amount,requestedAt:Date.now(),status:"pending",addedManually:true,notes:notes||""};
+    lsSet(`pg-pending-${username}`,pending);
+    if(db) await db.collection("pending_payments").doc(username).set(pending);
+    setPending(p=>{
+      const exists=p.find(x=>x.id===username);
+      if(exists)return p.map(x=>x.id===username?{id:username,...pending}:x);
+      return [...p,{id:username,...pending}];
+    });
+    setAddPayModal(false);
+    setMsg({type:"ok",text:`✓ Pending payment added for @${username}`});
+    setTimeout(()=>setMsg(null),4000);
+  }
 
   async function activate(username,plan,days){
     const d=days||customDays||30;
@@ -2428,8 +2555,15 @@ function VAdmin(){
           <div style={{fontFamily:"var(--fd)",fontSize:18,fontWeight:800,color:"var(--gold)"}}>⚙ Admin Dashboard</div>
           <div style={{fontSize:10,color:"var(--text3)",letterSpacing:2,marginTop:2}}>AMISCO4U2 · FULL ACCESS</div>
         </div>
-        <div style={{fontSize:10,color:"var(--text3)"}}>Firebase: <span style={{color:db?"var(--green)":"var(--red)"}}>{db?"Connected ✓":"Offline"}</span></div>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <span style={{fontSize:10,color:"var(--text3)"}}>Firebase: <span style={{color:db?"var(--green)":"var(--red)"}}>{db?"Connected ✓":"Offline"}</span></span>
+          <button className="btn-sm" style={{fontSize:11,padding:"6px 14px"}} onClick={reload}>↻ Refresh</button>
+          <button className="btn" style={{fontSize:11,padding:"7px 16px"}} onClick={()=>setAddPayModal(true)}>＋ Add Payment</button>
+        </div>
       </div>
+
+      {/* Manual pending payment modal */}
+      {addPayModal&&<AddPendingModal onClose={()=>setAddPayModal(false)} onSave={addManualPending}/>}
 
       {msg&&<div className={`notice ${msg.type==="ok"?"notice-ok":"notice-warn"}`} style={{marginBottom:14}}>{msg.text}</div>}
 
@@ -2476,18 +2610,28 @@ function VAdmin(){
                 const age=Math.floor((Date.now()-p.requestedAt)/60000);
                 const ageStr=age<60?`${age}m ago`:age<1440?`${Math.floor(age/60)}h ago`:`${Math.floor(age/1440)}d ago`;
                 return(
-                  <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 0",borderBottom:"1px solid var(--border)",gap:10,flexWrap:"wrap"}}>
-                    <div>
-                      <div style={{fontWeight:700,fontSize:13,color:"var(--text)",marginBottom:2}}>@{p.id}</div>
-                      <div style={{fontSize:11,color:"var(--text3)"}}>{plan?.name||p.plan} · {plan?.priceLabel} · {ageStr}</div>
+                  <div key={p.id} style={{padding:"14px 0",borderBottom:"1px solid var(--border)"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap",marginBottom:8}}>
+                      <div>
+                        <div style={{fontWeight:700,fontSize:14,color:"var(--text)",marginBottom:3}}>@{p.id}</div>
+                        <div style={{fontSize:11,color:"var(--text3)",marginBottom:p.notes?4:0}}>{plan?.name||p.plan} · {plan?.priceLabel} · {ageStr}</div>
+                        {p.addedManually&&<span style={{fontSize:9,background:"#3b82f620",color:"var(--blue)",border:"1px solid #3b82f640",borderRadius:4,padding:"1px 6px",letterSpacing:1}}>MANUALLY ADDED</span>}
+                        {p.notes&&<div style={{fontSize:11,color:"var(--gold)",marginTop:4}}>Note: {p.notes}</div>}
+                      </div>
+                      <div style={{display:"flex",gap:7,flexShrink:0,flexWrap:"wrap"}}>
+                        {Object.values(PLANS).map(pl=>(
+                          <button key={pl.id} className={pl.id===p.plan?"btn":"btn-sm"} style={{padding:"8px 12px",fontSize:10}} onClick={()=>activate(p.id,pl.id,30)}>
+                            ✓ {pl.name}
+                          </button>
+                        ))}
+                        <button className="btn-danger" style={{fontSize:10,padding:"8px 10px"}} onClick={()=>deactivate(p.id)}>Reject</button>
+                      </div>
                     </div>
-                    <div style={{display:"flex",gap:7,flexShrink:0,flexWrap:"wrap"}}>
-                      {Object.values(PLANS).map(pl=>(
-                        <button key={pl.id} className={pl.id===p.plan?"btn":"btn-sm"} style={{padding:"8px 12px",fontSize:9}} onClick={()=>activate(p.id,pl.id,30)}>
-                          ✓ {pl.name}
-                        </button>
-                      ))}
-                      <button className="btn-danger" style={{fontSize:9,padding:"8px 10px"}} onClick={()=>deactivate(p.id)}>Reject</button>
+                    {/* Custom days activation */}
+                    <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+                      <button className="btn-sm" style={{fontSize:9,padding:"5px 12px",color:"var(--green)",borderColor:"var(--green)"}} onClick={()=>activate(p.id,p.plan||"standard",90)}>✓ 90 days</button>
+                      <button className="btn-sm" style={{fontSize:9,padding:"5px 12px",color:"var(--green)",borderColor:"var(--green)"}} onClick={()=>activate(p.id,p.plan||"standard",180)}>✓ 180 days</button>
+                      <button className="btn-sm" style={{fontSize:9,padding:"5px 12px",color:"var(--green)",borderColor:"var(--green)"}} onClick={()=>activate(p.id,p.plan||"standard",365)}>✓ 1 year</button>
                     </div>
                   </div>
                 );
