@@ -575,6 +575,11 @@ const PX={
   download:"M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4",
   upload:"M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12",
   cloud:"M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z",
+  expense:"M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M12 7v4m6 8H3a2 2 0 01-2-2V7a2 2 0 012-2h1.5M15 3h2a2 2 0 012 2v4",
+  wrench:"M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z",
+  shield:"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
+  oil:"M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05zM12.56 6.6A10.97 10.97 0 0014 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 01-11.91 4.97",
+  roadworthy:"M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
 };
 function Ic({name,size=16,color="currentColor"}){
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={PX[name]}/></svg>;
@@ -1001,6 +1006,7 @@ function Dashboard({session,subStatus,onLogout}){
   const [drivers,setDrivers]=useState([]);
   const [sales,setSales]=useState({});
   const [wap,setWap]=useState({});
+  const [expenditure,setExpenditure]=useState({oilChanges:[],mechanical:[],roadworthy:{},insurance:{}});
   const [loaded,setLoaded]=useState(false);
   const [modal,setModal]=useState(null);
   const [selYear,setSelYear]=useState(CY.toString());
@@ -1026,6 +1032,7 @@ function Dashboard({session,subStatus,onLogout}){
       setDrivers(lsGet(`${u}-drivers`)||[]);
       setSales(lsGet(`${u}-sales`)||{});
       setWap(lsGet(`${u}-wap`)||{});
+      setExpenditure(lsGet(`${u}-expenditure`)||{oilChanges:[],mechanical:[],roadworthy:{},insurance:{}});
       setLoaded(true);
       return;
     }
@@ -1039,6 +1046,7 @@ function Dashboard({session,subStatus,onLogout}){
             if(data.drivers!==undefined) setDrivers(data.drivers||[]);
             if(data.sales!==undefined)   setSales(data.sales||{});
             if(data.wap!==undefined)     setWap(data.wap||{});
+            if(data.expenditure!==undefined) setExpenditure(data.expenditure||{oilChanges:[],mechanical:[],roadworthy:{},insurance:{}});
           } else {
             setDrivers([]); setSales({}); setWap({});
           }
@@ -1049,6 +1057,7 @@ function Dashboard({session,subStatus,onLogout}){
           setDrivers(lsGet(`${u}-drivers`)||[]);
           setSales(lsGet(`${u}-sales`)||{});
           setWap(lsGet(`${u}-wap`)||{});
+          setExpenditure(lsGet(`${u}-expenditure`)||{oilChanges:[],mechanical:[],roadworthy:{},insurance:{}});
           setLoaded(true);
         }
       );
@@ -1084,9 +1093,11 @@ function Dashboard({session,subStatus,onLogout}){
     catch(e){ setSyncState("error"); }
   },[u,showToast]);
 
+  const saveExpenditure=async(val)=>{ setSyncState("saving"); try{ await dbSet(u,"expenditure",val); setSyncState("saved"); showToast(); } catch(e){ setSyncState("error"); } };
   const debouncedSaveDrivers=useDebouncedCallback(saveDrivers,1500);
   const debouncedSaveSales=useDebouncedCallback(saveSales,1500);
   const debouncedSaveWap=useDebouncedCallback(saveWap,1500);
+  const debouncedSaveExpenditure=useDebouncedCallback(saveExpenditure,1500);
 
   const updSale=(did,yr,mo,wk,val)=>{
     setSales(p=>{
@@ -1100,6 +1111,7 @@ function Dashboard({session,subStatus,onLogout}){
       debouncedSaveWap(n);return n;
     });
   };
+  const updExpenditure=(newExp)=>{ setExpenditure(newExp); debouncedSaveExpenditure(newExp); };
   const saveDrv=d=>{
     const newList=d.id?drivers.map(x=>x.id===d.id?d:x):[...drivers,{...d,id:drivers.length?Math.max(...drivers.map(x=>x.id))+1:1}];
     setDrivers(newList);debouncedSaveDrivers(newList);setModal(null);
@@ -1185,6 +1197,7 @@ function Dashboard({session,subStatus,onLogout}){
     {id:"workpay",label:"W&P",icon:"wap"},
     {id:"reports",label:"Reports",icon:"report"},
     {id:"transfer",label:"Data",icon:"transfer"},
+    {id:"expenditure",label:"Costs",icon:"expense"},
     ...(session.isDev?[{id:"admin",label:"Admin ⚙",icon:"drivers"}]:[]),
   ];
   const period={selYear,selMonth,setSelYear,setSelMonth};
@@ -1292,6 +1305,7 @@ function Dashboard({session,subStatus,onLogout}){
           {view==="workpay"  &&<VWap wapD={wapD} wap={wap} updWap={updWap} {...period}/>}
           {view==="reports"  &&<VReports regD={regD} wapD={wapD} drivers={drivers} sales={sales} wap={wap} {...period} onExport={doExport}/>}
           {view==="transfer" &&<VTransfer drivers={drivers} sales={sales} wap={wap} session={session} onExport={doExport} onImport={()=>setImportModal(true)}/>}
+          {view==="expenditure"&&<VExpenditure drivers={drivers} expenditure={expenditure} updExpenditure={updExpenditure} yearSales={yearSales} selYear={selYear} selMonth={selMonth}/>}
           {view==="admin"    &&session.isDev&&<VAdmin/>}
           </div>
         </div>
@@ -1791,6 +1805,533 @@ function InstallGuide(){
 }
 
 // ── ADMIN PANEL (DEV account only) — activate users ──────────
+
+// ══════════════════════════════════════════════════════════════════
+// EXPENDITURE VIEW — Oil Change · Mechanical · Roadworthy · Insurance
+// ══════════════════════════════════════════════════════════════════
+function VExpenditure({drivers,expenditure,updExpenditure,yearSales,selYear,selMonth}){
+  const [tab,setTab]=useState("summary");
+  const [modal,setModal]=useState(null);
+
+  const exp=expenditure||{oilChanges:[],mechanical:[],roadworthy:{},insurance:{}};
+
+  /* ── helpers ─────────────────────────────────────────────────── */
+  const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  const fmtD=d=>{if(!d)return"—";try{return new Date(d+"T12:00:00").toLocaleDateString("en-GH",{day:"numeric",month:"short",year:"numeric"});}catch{return d;}};
+  const addDays=(d,n)=>{if(!d)return"";const dt=new Date(d+"T12:00:00");dt.setDate(dt.getDate()+n);return dt.toISOString().slice(0,10);};
+  const addYears=(d,n)=>{if(!d)return"";const dt=new Date(d+"T12:00:00");dt.setFullYear(dt.getFullYear()+n);return dt.toISOString().slice(0,10);};
+  const daysUntil=d=>{if(!d)return null;return Math.ceil((new Date(d+"T12:00:00")-new Date())/86400000);};
+  const urgColor=days=>{if(days===null)return"var(--text3)";if(days<0)return"var(--red)";if(days<=30)return"var(--red)";if(days<=60)return"var(--gold)";return"var(--green)";};
+  const urgLabel=days=>{if(days===null)return"Not set";if(days<0)return`${Math.abs(days)}d overdue`;if(days===0)return"Due today!";return`${days}d away`;};
+
+  /* ── totals ──────────────────────────────────────────────────── */
+  const totOil =(exp.oilChanges||[]).reduce((s,r)=>s+(Number(r.cost)||0),0);
+  const totMech=(exp.mechanical ||[]).reduce((s,r)=>s+(Number(r.cost)||0),0);
+  const totRW  =Object.values(exp.roadworthy||{}).reduce((s,r)=>s+(Number(r.cost)||0),0);
+  const totIns =Object.values(exp.insurance ||{}).reduce((s,r)=>s+(Number(r.cost)||0),0);
+  const totExp =totOil+totMech+totRW+totIns;
+  const netBal =yearSales-totExp;
+
+  /* ── upcoming alerts ─────────────────────────────────────────── */
+  const alertOil=drivers.filter(d=>{
+    const last=(exp.oilChanges||[]).filter(o=>o.driverId===d.id).sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+    if(!last)return true;
+    return daysUntil(addDays(last.date,14))<=3;
+  });
+  const alertRW =drivers.filter(d=>{const r=exp.roadworthy?.[d.id];if(!r?.lastDate)return false;return daysUntil(addYears(r.lastDate,1))<=60;});
+  const alertIns=drivers.filter(d=>{const r=exp.insurance ?.[d.id];if(!r?.lastDate)return false;return daysUntil(addYears(r.lastDate,1))<=60;});
+
+  /* ── save helpers ─────────────────────────────────────────────── */
+  const saveOil =rec=>{const list=exp.oilChanges||[];updExpenditure({...exp,oilChanges:rec.id?list.map(r=>r.id===rec.id?rec:r):[...list,{...rec,id:uid()}]});setModal(null);};
+  const delOil  =id=>{if(!confirm("Delete oil change record?"))return;updExpenditure({...exp,oilChanges:(exp.oilChanges||[]).filter(r=>r.id!==id)});};
+  const saveMech=rec=>{const list=exp.mechanical||[];updExpenditure({...exp,mechanical:rec.id?list.map(r=>r.id===rec.id?rec:r):[...list,{...rec,id:uid()}]});setModal(null);};
+  const delMech =id=>{if(!confirm("Delete fault record?"))return;updExpenditure({...exp,mechanical:(exp.mechanical||[]).filter(r=>r.id!==id)});};
+  const saveRW  =(did,rec)=>{updExpenditure({...exp,roadworthy:{...exp.roadworthy,[did]:rec}});setModal(null);};
+  const saveIns =(did,rec)=>{updExpenditure({...exp,insurance:{...exp.insurance,[did]:rec}});setModal(null);};
+
+  const TABS=[
+    {id:"summary",   label:"Summary",   ico:"dashboard"},
+    {id:"oil",       label:"Oil Change",ico:"oil"},
+    {id:"mechanical",label:"Mechanical",ico:"wrench"},
+    {id:"roadworthy",label:"Roadworthy",ico:"roadworthy"},
+    {id:"insurance", label:"Insurance", ico:"shield"},
+  ];
+
+  /* ── shared input style ─────────────────────────────────────── */
+  const IS={width:"100%",background:"var(--bg)",border:"1px solid var(--border2)",borderRadius:6,color:"var(--text)",padding:"10px 12px",fontSize:12,outline:"none",fontFamily:"var(--fm)"};
+
+  /* ════════════════════════════════════════════════════════════ */
+  return(
+    <div style={{padding:"14px 12px",maxWidth:860,margin:"0 auto"}}>
+      {/* Page header */}
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:700,color:"var(--gold)",letterSpacing:2,textTransform:"uppercase"}}>💸 Expenditure Tracker</div>
+        <div style={{fontSize:10,color:"var(--text3)",marginTop:2}}>Track all costs & estimate net profit against total year sales</div>
+      </div>
+
+      {/* Alert strip */}
+      {(alertOil.length||alertRW.length||alertIns.length)>0&&(
+        <div style={{background:"#ef444410",border:"1px solid #ef444430",borderRadius:8,padding:"10px 14px",marginBottom:12}}>
+          <div style={{fontSize:9,fontWeight:700,color:"var(--red)",letterSpacing:2,marginBottom:6}}>🔔 ATTENTION REQUIRED</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {alertOil.map(d=><span key={d.id} style={{fontSize:9,padding:"2px 8px",background:"#f5a62320",color:"var(--gold)",border:"1px solid #f5a62340",borderRadius:4}}>🛢 Oil due: {d.name||d.plate}</span>)}
+            {alertRW.map(d=>{const days=daysUntil(addYears(exp.roadworthy[d.id].lastDate,1));return<span key={d.id} style={{fontSize:9,padding:"2px 8px",background:"#3b82f620",color:"var(--blue)",border:"1px solid #3b82f640",borderRadius:4}}>🛡 RW {urgLabel(days)}: {d.name||d.plate}</span>;})}
+            {alertIns.map(d=>{const days=daysUntil(addYears(exp.insurance[d.id].lastDate,1));return<span key={d.id} style={{fontSize:9,padding:"2px 8px",background:"#22c55e20",color:"var(--green)",border:"1px solid #22c55e40",borderRadius:4}}>🔒 Ins {urgLabel(days)}: {d.name||d.plate}</span>;})}
+          </div>
+        </div>
+      )}
+
+      {/* Tab bar */}
+      <div style={{display:"flex",gap:4,marginBottom:14,overflowX:"auto",paddingBottom:2,WebkitOverflowScrolling:"touch"}}>
+        {TABS.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            style={{display:"flex",alignItems:"center",gap:5,padding:"7px 11px",background:tab===t.id?"var(--gold)":"var(--bg2)",border:`1px solid ${tab===t.id?"var(--gold)":"var(--border)"}`,borderRadius:6,cursor:"pointer",color:tab===t.id?"#0a0a0f":"var(--text3)",fontFamily:"var(--fm)",fontSize:10,letterSpacing:1,textTransform:"uppercase",whiteSpace:"nowrap",flexShrink:0,transition:"all .15s"}}>
+            <Ic name={t.ico} size={11} color={tab===t.id?"#0a0a0f":"var(--text3)"}/>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ─────────────── SUMMARY ─────────────── */}
+      {tab==="summary"&&(
+        <div>
+          {/* Top KPI cards */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:8,marginBottom:12}}>
+            {[
+              {label:`${selYear} Year Sales`,val:yearSales,color:"var(--gold)"},
+              {label:"Total Expenditure",val:totExp,color:"var(--red)"},
+              {label:"Net Balance",val:netBal,color:netBal>=0?"var(--green)":"var(--red)",sub:netBal>=0?"After all costs":"⚠ Costs > Sales"},
+            ].map(({label,val,color,sub})=>(
+              <div key={label} style={{background:"var(--bg2)",border:`1px solid ${color}22`,borderRadius:8,padding:12}}>
+                <div style={{fontSize:9,letterSpacing:2,color:"var(--text3)",marginBottom:4}}>{label.toUpperCase()}</div>
+                <div style={{fontSize:17,fontWeight:800,color,fontFamily:"var(--fd)"}}>{fmt(val)}</div>
+                {sub&&<div style={{fontSize:9,color:"var(--text3)",marginTop:2}}>{sub}</div>}
+              </div>
+            ))}
+          </div>
+
+          {/* Breakdown bars */}
+          {totExp>0&&(
+            <div style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:8,padding:14,marginBottom:12}}>
+              <div style={{fontSize:9,letterSpacing:2,color:"var(--text3)",marginBottom:10}}>COST BREAKDOWN</div>
+              {[["🛢 Oil Changes",totOil,"#f5a623"],["🔧 Mechanical",totMech,"var(--red)"],["🛡 Roadworthy",totRW,"var(--blue)"],["🔒 Insurance",totIns,"var(--green)"]].map(([label,val,col])=>(
+                <div key={label} style={{marginBottom:9}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                    <span style={{fontSize:10,color:"var(--text2)"}}>{label}</span>
+                    <span style={{fontSize:10,fontWeight:700,color:col,fontFamily:"var(--fm)"}}>{fmt(val)}</span>
+                  </div>
+                  <div style={{height:4,background:"var(--border)",borderRadius:2,overflow:"hidden"}}>
+                    <div style={{height:"100%",background:col,borderRadius:2,width:`${totExp>0?val/totExp*100:0}%`,transition:"width .4s"}}/>
+                  </div>
+                </div>
+              ))}
+              <div style={{display:"flex",justifyContent:"space-between",paddingTop:10,borderTop:"1px solid var(--border)",marginTop:2}}>
+                <span style={{fontSize:10,color:"var(--text3)"}}>Expenditure as % of year sales</span>
+                <span style={{fontSize:11,fontWeight:700,color:yearSales>0&&totExp/yearSales>0.3?"var(--red)":"var(--gold)",fontFamily:"var(--fm)"}}>{yearSales>0?(totExp/yearSales*100).toFixed(1):0}%</span>
+              </div>
+            </div>
+          )}
+
+          {/* Per-vehicle table */}
+          <div style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:8,padding:14}}>
+            <div style={{fontSize:9,letterSpacing:2,color:"var(--text3)",marginBottom:10}}>PER VEHICLE COST SUMMARY</div>
+            {drivers.length===0&&<div style={{fontSize:11,color:"var(--text3)"}}>No drivers added yet.</div>}
+            {drivers.map(d=>{
+              const oils=(exp.oilChanges||[]).filter(o=>o.driverId===d.id).reduce((s,o)=>s+(Number(o.cost)||0),0);
+              const mechs=(exp.mechanical||[]).filter(m=>m.driverId===d.id).reduce((s,m)=>s+(Number(m.cost)||0),0);
+              const rw=Number(exp.roadworthy?.[d.id]?.cost)||0;
+              const ins=Number(exp.insurance?.[d.id]?.cost)||0;
+              const total=oils+mechs+rw+ins;
+              const lastOil=(exp.oilChanges||[]).filter(o=>o.driverId===d.id).sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+              const oilDays=lastOil?daysUntil(addDays(lastOil.date,14)):null;
+              const rwDays=exp.roadworthy?.[d.id]?.lastDate?daysUntil(addYears(exp.roadworthy[d.id].lastDate,1)):null;
+              const insDays=exp.insurance?.[d.id]?.lastDate?daysUntil(addYears(exp.insurance[d.id].lastDate,1)):null;
+              return(
+                <div key={d.id} style={{padding:"10px 0",borderBottom:"1px solid var(--border2)"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                    <div>
+                      <span style={{fontSize:11,fontWeight:700,color:"var(--text)"}}>{d.name||"—"}</span>
+                      <span style={{fontSize:10,color:"var(--text3)",marginLeft:7}}>{d.plate||""}</span>
+                    </div>
+                    <span style={{fontSize:13,fontWeight:800,color:total>0?"var(--red)":"var(--text3)",fontFamily:"var(--fd)"}}>{fmt(total)}</span>
+                  </div>
+                  <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:4}}>
+                    {oils>0&&<span style={{fontSize:9,padding:"2px 6px",background:"#f5a62315",color:"var(--gold)",border:"1px solid #f5a62330",borderRadius:3}}>Oil {fmt(oils)}</span>}
+                    {mechs>0&&<span style={{fontSize:9,padding:"2px 6px",background:"#ef444415",color:"var(--red)",border:"1px solid #ef444430",borderRadius:3}}>Mech {fmt(mechs)}</span>}
+                    {rw>0&&<span style={{fontSize:9,padding:"2px 6px",background:"#3b82f615",color:"var(--blue)",border:"1px solid #3b82f630",borderRadius:3}}>RW {fmt(rw)}</span>}
+                    {ins>0&&<span style={{fontSize:9,padding:"2px 6px",background:"#22c55e15",color:"var(--green)",border:"1px solid #22c55e30",borderRadius:3}}>Ins {fmt(ins)}</span>}
+                  </div>
+                  <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+                    <span style={{fontSize:9,color:urgColor(oilDays)}}>🛢 Oil: {urgLabel(oilDays)}</span>
+                    <span style={{fontSize:9,color:urgColor(rwDays)}}>🛡 RW: {urgLabel(rwDays)}</span>
+                    <span style={{fontSize:9,color:urgColor(insDays)}}>🔒 Ins: {urgLabel(insDays)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────── OIL CHANGE ─────────────── */}
+      {tab==="oil"&&(
+        <div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <div>
+              <div style={{fontSize:11,color:"var(--text2)"}}>Every <b style={{color:"var(--gold)"}}>2 weeks</b> per vehicle &nbsp;·&nbsp; Total: <b style={{color:"var(--gold)"}}>{fmt(totOil)}</b></div>
+              <div style={{fontSize:10,color:"var(--text3)",marginTop:2}}>Records trigger an overdue alert after 14 days</div>
+            </div>
+            <button className="btn" style={{fontSize:10,padding:"7px 12px"}} onClick={()=>setModal({type:"oil"})}>
+              <Ic name="plus" size={11} color="#0a0a0f"/> Add Record
+            </button>
+          </div>
+          {drivers.map(d=>{
+            const records=(exp.oilChanges||[]).filter(o=>o.driverId===d.id).sort((a,b)=>new Date(b.date)-new Date(a.date));
+            const last=records[0];
+            const nextDue=last?addDays(last.date,14):null;
+            const days=daysUntil(nextDue);
+            return(
+              <div key={d.id} style={{background:"var(--bg2)",border:`1px solid ${records.length===0?"var(--border)":days!==null&&days<=3?"var(--red)":"var(--border)"}`,borderRadius:8,padding:12,marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:6}}>
+                  <div>
+                    <span style={{fontSize:11,fontWeight:700,color:"var(--text)"}}>{d.name||"—"}</span>
+                    <span style={{fontSize:10,color:"var(--text3)",marginLeft:7}}>{d.plate||""}</span>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    {nextDue&&<span style={{fontSize:9,padding:"2px 8px",background:`${urgColor(days)}20`,color:urgColor(days),border:`1px solid ${urgColor(days)}40`,borderRadius:4}}>
+                      Next: {fmtD(nextDue)} ({urgLabel(days)})
+                    </span>}
+                    <button onClick={()=>setModal({type:"oil",driverId:d.id})} style={{background:"var(--bg)",border:"1px solid var(--border2)",borderRadius:5,padding:"4px 9px",color:"var(--text2)",fontSize:9,cursor:"pointer",fontFamily:"var(--fm)"}}>+ Add</button>
+                  </div>
+                </div>
+                {records.length===0?(
+                  <div style={{fontSize:10,color:"var(--red)"}}>⚠ No oil change recorded — add first record</div>
+                ):(
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
+                    <thead><tr style={{color:"var(--text3)"}}>
+                      <th style={{textAlign:"left",padding:"4px 0",borderBottom:"1px solid var(--border2)"}}>DATE</th>
+                      <th style={{textAlign:"left",padding:"4px 0",borderBottom:"1px solid var(--border2)"}}>NOTES</th>
+                      <th style={{textAlign:"right",padding:"4px 0",borderBottom:"1px solid var(--border2)"}}>COST</th>
+                      <th style={{width:26,borderBottom:"1px solid var(--border2)"}}></th>
+                    </tr></thead>
+                    <tbody>
+                      {records.map(r=>(
+                        <tr key={r.id}>
+                          <td style={{padding:"5px 0",color:"var(--text2)",whiteSpace:"nowrap"}}>{fmtD(r.date)}</td>
+                          <td style={{padding:"5px 0",color:"var(--text3)"}}>{r.notes||"—"}</td>
+                          <td style={{padding:"5px 0",textAlign:"right",color:"var(--gold)",fontWeight:700}}>{fmt(r.cost)}</td>
+                          <td style={{padding:"5px 0",textAlign:"right"}}><button onClick={()=>delOil(r.id)} style={{background:"none",border:"none",cursor:"pointer",padding:2,opacity:.5}}><Ic name="trash" size={11} color="var(--red)"/></button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot><tr>
+                      <td colSpan={2} style={{paddingTop:6,fontSize:9,color:"var(--text3)",borderTop:"1px solid var(--border2)"}}>Total oil cost for this vehicle</td>
+                      <td style={{paddingTop:6,textAlign:"right",fontWeight:800,color:"var(--gold)",borderTop:"1px solid var(--border2)"}}>{fmt(records.reduce((s,r)=>s+(Number(r.cost)||0),0))}</td>
+                      <td style={{borderTop:"1px solid var(--border2)"}}></td>
+                    </tr></tfoot>
+                  </table>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ─────────────── MECHANICAL ─────────────── */}
+      {tab==="mechanical"&&(
+        <div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <div style={{fontSize:11,color:"var(--text2)"}}>Mechanical faults & repairs &nbsp;·&nbsp; Total: <b style={{color:"var(--red)"}}>{fmt(totMech)}</b></div>
+            <button className="btn" style={{fontSize:10,padding:"7px 12px"}} onClick={()=>setModal({type:"mech"})}>
+              <Ic name="plus" size={11} color="#0a0a0f"/> Log Fault
+            </button>
+          </div>
+          {(exp.mechanical||[]).length===0&&(
+            <div style={{textAlign:"center",padding:"40px 16px",color:"var(--text3)"}}>
+              <div style={{fontSize:26,marginBottom:8}}>🔧</div>
+              <div style={{fontSize:11}}>No mechanical fault records yet.</div>
+            </div>
+          )}
+          {drivers.map(d=>{
+            const records=(exp.mechanical||[]).filter(m=>m.driverId===d.id).sort((a,b)=>new Date(b.date)-new Date(a.date));
+            if(!records.length)return null;
+            return(
+              <div key={d.id} style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:8,padding:12,marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                  <div><span style={{fontSize:11,fontWeight:700,color:"var(--text)"}}>{d.name||"—"}</span><span style={{fontSize:10,color:"var(--text3)",marginLeft:7}}>{d.plate||""}</span></div>
+                  <span style={{fontSize:12,fontWeight:800,color:"var(--red)",fontFamily:"var(--fd)"}}>{fmt(records.reduce((s,r)=>s+(Number(r.cost)||0),0))}</span>
+                </div>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
+                  <thead><tr style={{color:"var(--text3)"}}>
+                    <th style={{textAlign:"left",padding:"4px 0",borderBottom:"1px solid var(--border2)"}}>DATE</th>
+                    <th style={{textAlign:"left",padding:"4px 0",borderBottom:"1px solid var(--border2)"}}>FAULT</th>
+                    <th style={{textAlign:"right",padding:"4px 0",borderBottom:"1px solid var(--border2)"}}>COST</th>
+                    <th style={{width:26,borderBottom:"1px solid var(--border2)"}}></th>
+                  </tr></thead>
+                  <tbody>
+                    {records.map(r=>(
+                      <tr key={r.id}>
+                        <td style={{padding:"5px 0",color:"var(--text2)",whiteSpace:"nowrap"}}>{fmtD(r.date)}</td>
+                        <td style={{padding:"5px 0",color:"var(--text2)"}}>{r.description||"—"}</td>
+                        <td style={{padding:"5px 0",textAlign:"right",color:"var(--red)",fontWeight:700}}>{fmt(r.cost)}</td>
+                        <td style={{padding:"5px 0",textAlign:"right"}}><button onClick={()=>delMech(r.id)} style={{background:"none",border:"none",cursor:"pointer",padding:2,opacity:.5}}><Ic name="trash" size={11} color="var(--red)"/></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
+          {/* Vehicles with no faults */}
+          {drivers.filter(d=>!(exp.mechanical||[]).some(m=>m.driverId===d.id)).map(d=>(
+            <div key={d.id} style={{background:"var(--bg2)",border:"1px dashed var(--border2)",borderRadius:8,padding:"10px 14px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:10,color:"var(--text3)"}}>{d.name||"—"} — No faults recorded</span>
+              <button className="btn" style={{fontSize:9,padding:"4px 10px"}} onClick={()=>setModal({type:"mech",driverId:d.id})}>Add</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ─────────────── ROADWORTHY ─────────────── */}
+      {tab==="roadworthy"&&(
+        <div>
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:11,color:"var(--text2)"}}>Yearly roadworthy renewal &nbsp;·&nbsp; Total paid: <b style={{color:"var(--blue)"}}>{fmt(totRW)}</b></div>
+            <div style={{fontSize:10,color:"var(--text3)",marginTop:2}}>Next renewal = last renewal date + 1 year · Alerts at 60 days &amp; 30 days</div>
+          </div>
+          {drivers.map(d=>{
+            const r=exp.roadworthy?.[d.id];
+            const nextDate=r?.lastDate?addYears(r.lastDate,1):null;
+            const days=daysUntil(nextDate);
+            const bc=days!==null&&days<=30?"var(--red)":days!==null&&days<=60?"var(--gold)":"var(--border)";
+            return(
+              <div key={d.id} style={{background:"var(--bg2)",border:`1px solid ${bc}`,borderRadius:8,padding:14,marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8,marginBottom:r?.lastDate?10:0}}>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,color:"var(--text)"}}>{d.name||"—"}</div>
+                    <div style={{fontSize:10,color:"var(--text3)",marginTop:1}}>{d.plate||"No plate"}</div>
+                  </div>
+                  <button onClick={()=>setModal({type:"roadworthy",driverId:d.id,data:r||{}})}
+                    style={{background:"var(--bg)",border:"1px solid var(--border2)",borderRadius:5,padding:"5px 11px",color:"var(--text2)",fontSize:10,cursor:"pointer",fontFamily:"var(--fm)"}}>
+                    {r?.lastDate?"✏ Edit":"＋ Set Date"}
+                  </button>
+                </div>
+                {r?.lastDate?(
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8}}>
+                    <div style={{background:"var(--bg)",borderRadius:6,padding:10}}>
+                      <div style={{fontSize:9,letterSpacing:1,color:"var(--text3)",marginBottom:3}}>LAST RENEWED</div>
+                      <div style={{fontSize:11,fontWeight:700,color:"var(--text)"}}>{fmtD(r.lastDate)}</div>
+                    </div>
+                    <div style={{background:"var(--bg)",borderRadius:6,padding:10,border:`1px solid ${urgColor(days)}30`}}>
+                      <div style={{fontSize:9,letterSpacing:1,color:"var(--text3)",marginBottom:3}}>NEXT RENEWAL</div>
+                      <div style={{fontSize:11,fontWeight:700,color:urgColor(days)}}>{fmtD(nextDate)}</div>
+                      <div style={{fontSize:9,color:urgColor(days),marginTop:2}}>({urgLabel(days)})</div>
+                    </div>
+                    <div style={{background:"var(--bg)",borderRadius:6,padding:10}}>
+                      <div style={{fontSize:9,letterSpacing:1,color:"var(--text3)",marginBottom:3}}>FEE PAID</div>
+                      <div style={{fontSize:11,fontWeight:700,color:"var(--blue)"}}>{fmt(r.cost||0)}</div>
+                    </div>
+                    {r.notes&&<div style={{background:"var(--bg)",borderRadius:6,padding:10,gridColumn:"1/-1"}}>
+                      <div style={{fontSize:9,letterSpacing:1,color:"var(--text3)",marginBottom:2}}>NOTES</div>
+                      <div style={{fontSize:10,color:"var(--text2)"}}>{r.notes}</div>
+                    </div>}
+                  </div>
+                ):(
+                  <div style={{fontSize:10,color:"var(--text3)"}}>⚠ Roadworthy date not set — click "Set Date" to record</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ─────────────── INSURANCE ─────────────── */}
+      {tab==="insurance"&&(
+        <div>
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:11,color:"var(--text2)"}}>Yearly insurance renewal &nbsp;·&nbsp; Total paid: <b style={{color:"var(--green)"}}>{fmt(totIns)}</b></div>
+            <div style={{fontSize:10,color:"var(--text3)",marginTop:2}}>Next renewal = last renewal date + 1 year · Alerts at 60 days &amp; 30 days</div>
+          </div>
+          {drivers.map(d=>{
+            const r=exp.insurance?.[d.id];
+            const nextDate=r?.lastDate?addYears(r.lastDate,1):null;
+            const days=daysUntil(nextDate);
+            const bc=days!==null&&days<=30?"var(--red)":days!==null&&days<=60?"var(--gold)":"var(--border)";
+            return(
+              <div key={d.id} style={{background:"var(--bg2)",border:`1px solid ${bc}`,borderRadius:8,padding:14,marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8,marginBottom:r?.lastDate?10:0}}>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,color:"var(--text)"}}>{d.name||"—"}</div>
+                    <div style={{fontSize:10,color:"var(--text3)",marginTop:1}}>{d.plate||"No plate"}</div>
+                  </div>
+                  <button onClick={()=>setModal({type:"insurance",driverId:d.id,data:r||{}})}
+                    style={{background:"var(--bg)",border:"1px solid var(--border2)",borderRadius:5,padding:"5px 11px",color:"var(--text2)",fontSize:10,cursor:"pointer",fontFamily:"var(--fm)"}}>
+                    {r?.lastDate?"✏ Edit":"＋ Set Date"}
+                  </button>
+                </div>
+                {r?.lastDate?(
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8}}>
+                    <div style={{background:"var(--bg)",borderRadius:6,padding:10}}>
+                      <div style={{fontSize:9,letterSpacing:1,color:"var(--text3)",marginBottom:3}}>LAST RENEWED</div>
+                      <div style={{fontSize:11,fontWeight:700,color:"var(--text)"}}>{fmtD(r.lastDate)}</div>
+                    </div>
+                    <div style={{background:"var(--bg)",borderRadius:6,padding:10,border:`1px solid ${urgColor(days)}30`}}>
+                      <div style={{fontSize:9,letterSpacing:1,color:"var(--text3)",marginBottom:3}}>NEXT RENEWAL</div>
+                      <div style={{fontSize:11,fontWeight:700,color:urgColor(days)}}>{fmtD(nextDate)}</div>
+                      <div style={{fontSize:9,color:urgColor(days),marginTop:2}}>({urgLabel(days)})</div>
+                    </div>
+                    <div style={{background:"var(--bg)",borderRadius:6,padding:10}}>
+                      <div style={{fontSize:9,letterSpacing:1,color:"var(--text3)",marginBottom:3}}>PREMIUM PAID</div>
+                      <div style={{fontSize:11,fontWeight:700,color:"var(--green)"}}>{fmt(r.cost||0)}</div>
+                    </div>
+                    {r.insurer&&<div style={{background:"var(--bg)",borderRadius:6,padding:10}}>
+                      <div style={{fontSize:9,letterSpacing:1,color:"var(--text3)",marginBottom:2}}>INSURER</div>
+                      <div style={{fontSize:10,color:"var(--text2)"}}>{r.insurer}</div>
+                    </div>}
+                    {r.notes&&<div style={{background:"var(--bg)",borderRadius:6,padding:10,gridColumn:"1/-1"}}>
+                      <div style={{fontSize:9,letterSpacing:1,color:"var(--text3)",marginBottom:2}}>NOTES</div>
+                      <div style={{fontSize:10,color:"var(--text2)"}}>{r.notes}</div>
+                    </div>}
+                  </div>
+                ):(
+                  <div style={{fontSize:10,color:"var(--text3)"}}>⚠ Insurance date not set — click "Set Date" to record</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ═══ MODALS ═══════════════════════════════════════════ */}
+      {modal&&modal.type==="oil"&&(
+        <ExpModal key="oil" title="🛢 Oil Change Record"
+          fields={[
+            {key:"driverId",label:"VEHICLE / DRIVER",type:"driversel",required:true},
+            {key:"date",label:"DATE OF CHANGE",type:"date",def:new Date().toISOString().slice(0,10)},
+            {key:"cost",label:"COST (GH₵)",type:"number"},
+            {key:"notes",label:"NOTES (OPTIONAL)",type:"text",placeholder:"Brand, mileage…"},
+          ]}
+          initDriverId={modal.driverId}
+          drivers={drivers}
+          onClose={()=>setModal(null)}
+          onSave={saveOil}
+          inputStyle={IS}
+        />
+      )}
+      {modal&&modal.type==="mech"&&(
+        <ExpModal key="mech" title="🔧 Mechanical Fault"
+          fields={[
+            {key:"driverId",label:"VEHICLE / DRIVER",type:"driversel",required:true},
+            {key:"date",label:"FAULT DATE",type:"date",def:new Date().toISOString().slice(0,10)},
+            {key:"description",label:"FAULT DESCRIPTION",type:"text",placeholder:"Engine overheating, brake failure…"},
+            {key:"cost",label:"REPAIR COST (GH₵)",type:"number"},
+            {key:"notes",label:"NOTES (OPTIONAL)",type:"text",placeholder:"Workshop name, part replaced…"},
+          ]}
+          initDriverId={modal.driverId}
+          drivers={drivers}
+          onClose={()=>setModal(null)}
+          onSave={saveMech}
+          inputStyle={IS}
+        />
+      )}
+      {modal&&(modal.type==="roadworthy"||modal.type==="insurance")&&(
+        <RenewalModal
+          title={modal.type==="roadworthy"?"🛡 Roadworthy Renewal":"🔒 Insurance Renewal"}
+          costLabel={modal.type==="roadworthy"?"ROADWORTHY FEE (GH₵)":"PREMIUM PAID (GH₵)"}
+          showInsurer={modal.type==="insurance"}
+          initData={modal.data||{}}
+          onClose={()=>setModal(null)}
+          onSave={d=>modal.type==="roadworthy"?saveRW(modal.driverId,d):saveIns(modal.driverId,d)}
+          inputStyle={IS}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── Generic expense entry modal ───────────────────────────────── */
+function ExpModal({title,fields,initDriverId,drivers,onClose,onSave,inputStyle}){
+  const init={};
+  fields.forEach(f=>{init[f.key]=f.key==="driverId"?initDriverId||"":f.def||"";});
+  const [f,setF]=useState(init);
+  const sv=(k,v)=>setF(p=>({...p,[k]:v}));
+  const canSave=!fields.find(x=>x.required&&!f[x.key]);
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+      <div style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:"16px 16px 0 0",padding:20,width:"100%",maxWidth:500,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+          <span style={{fontSize:13,fontWeight:700,color:"var(--text)"}}>{title}</span>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:20,lineHeight:1}}>✕</button>
+        </div>
+        {fields.map(field=>(
+          <div key={field.key} style={{marginBottom:12}}>
+            <div style={{fontSize:9,letterSpacing:2,color:"var(--text3)",marginBottom:5}}>{field.label}</div>
+            {field.type==="driversel"?(
+              <select style={inputStyle} value={f[field.key]} onChange={e=>sv(field.key,e.target.value)}>
+                <option value="">Select driver…</option>
+                {drivers.map(d=><option key={d.id} value={d.id}>{d.name||"—"}{d.plate?` · ${d.plate}`:""}</option>)}
+              </select>
+            ):(
+              <input type={field.type==="text"?"text":field.type} style={inputStyle}
+                value={f[field.key]} placeholder={field.placeholder||""}
+                onChange={e=>sv(field.key,e.target.value)}/>
+            )}
+          </div>
+        ))}
+        <button className="btn" style={{width:"100%",padding:13,fontSize:12,justifyContent:"center",marginTop:4}}
+          onClick={()=>onSave(f)} disabled={!canSave}>
+          Save Record
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Roadworthy / Insurance renewal modal ──────────────────────── */
+function RenewalModal({title,costLabel,showInsurer,initData,onClose,onSave,inputStyle}){
+  const [f,setF]=useState({lastDate:initData.lastDate||"",cost:initData.cost||"",insurer:initData.insurer||"",notes:initData.notes||""});
+  const sv=(k,v)=>setF(p=>({...p,[k]:v}));
+  const nextDate=f.lastDate?new Date(new Date(f.lastDate+"T12:00:00").setFullYear(new Date(f.lastDate+"T12:00:00").getFullYear()+1)).toLocaleDateString("en-GH",{day:"numeric",month:"long",year:"numeric"}):"";
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+      <div style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:"16px 16px 0 0",padding:20,width:"100%",maxWidth:500,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+          <span style={{fontSize:13,fontWeight:700,color:"var(--text)"}}>{title}</span>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:20,lineHeight:1}}>✕</button>
+        </div>
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:9,letterSpacing:2,color:"var(--text3)",marginBottom:5}}>LAST RENEWAL DATE</div>
+          <input type="date" style={inputStyle} value={f.lastDate} onChange={e=>sv("lastDate",e.target.value)}/>
+        </div>
+        {nextDate&&(
+          <div style={{background:"var(--bg)",border:"1px solid var(--gold)30",borderRadius:6,padding:"10px 14px",marginBottom:12}}>
+            <div style={{fontSize:9,letterSpacing:2,color:"var(--text3)",marginBottom:3}}>NEXT RENEWAL (AUTO-CALCULATED)</div>
+            <div style={{fontSize:13,fontWeight:700,color:"var(--gold)"}}>{nextDate}</div>
+          </div>
+        )}
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:9,letterSpacing:2,color:"var(--text3)",marginBottom:5}}>{costLabel}</div>
+          <input type="number" style={inputStyle} value={f.cost} placeholder="0" onChange={e=>sv("cost",e.target.value)}/>
+        </div>
+        {showInsurer&&(
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:9,letterSpacing:2,color:"var(--text3)",marginBottom:5}}>INSURANCE COMPANY</div>
+            <input style={inputStyle} value={f.insurer} placeholder="Enterprise, Prudential, SIC…" onChange={e=>sv("insurer",e.target.value)}/>
+          </div>
+        )}
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:9,letterSpacing:2,color:"var(--text3)",marginBottom:5}}>NOTES (OPTIONAL)</div>
+          <input style={inputStyle} value={f.notes} placeholder="Sticker no., policy no.…" onChange={e=>sv("notes",e.target.value)}/>
+        </div>
+        <button className="btn" style={{width:"100%",padding:13,fontSize:12,justifyContent:"center"}}
+          onClick={()=>onSave(f)} disabled={!f.lastDate}>
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function VAdmin(){
   const [users,setUsers]=useState({});
   const [pending,setPending]=useState([]);
